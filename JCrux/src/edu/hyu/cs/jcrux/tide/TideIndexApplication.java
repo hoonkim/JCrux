@@ -21,6 +21,9 @@ import edu.hyu.cs.pb.PeptidesPB.AuxLocation;
  */
 public class TideIndexApplication extends CruxApplication {
 
+	private int maxMods;
+	private String tmpfilePrefix;
+
 	/**
 	 * 펩타이드 저장하는 클래스 인듯.
 	 * 
@@ -194,7 +197,57 @@ public class TideIndexApplication extends CruxApplication {
 
 	@Override
 	public int main(String[] argv) {
-		// TODO Auto-generated method stub
+
+		final String optionList[] = { "decoy-format", "decoy-prefix", "enzyme",
+				"custom-enzyme", "digestion", "missed-cleavages", "max-length",
+				"max-mass", "min-length", "min-mass", "monoisotopic-precursor",
+				"mods-spec", "cterm-peptide-mods-spec",
+				"nterm-peptide-mods-spec", "cterm-protein-mods-spec",
+				"nterm-protein-mods-spec", "max-mods", "output-dir",
+				"overwrite", "peptide-list", "parameter-file", "seed",
+				// "PTMDB",
+				"verbosity" };
+
+		final String defaultCysteine = "C+57.0214637206";
+
+		// Crux command line parsing
+		int numOptions = optionList.length;
+		final String argList[] = { "protein fast file", "index name" };
+		int numArgs = argList.length;
+
+		initialize(argList, numArgs, optionList, numOptions, argv);
+
+		System.out.println("Running tide-index...");
+
+		// Build command line string
+		String cmdLine = "crux tide-index";
+		for (int i = 1; i < argv.length; ++i) {
+			cmdLine += " ";
+			cmdLine += argv[i];
+		}
+
+		
+		// cmake 명령어 인듯 FLAGS_tmpfile_prefix =
+		// make_file_path("modified_peptides_partial_");
+
+		// Get Options
+
+//		double minMass = getDoubleParameter("min-mass");
+//		double maxMass = getDoubleParameter("max-mass");
+//		int minLength = getIntParameter("min-length");
+//		int maxLength = getIntParameter("max-length");
+//		boolean monoisotopicPrecursor = getBooleanParameter("monoisotopic-precursor");
+//		// FLAGSMaxMods = get_int_parameter("max-mods");
+//		MASS_TYPE mass_type = (monoisotopicPrecursor) ? MONO : AVERAGE;
+//		int missed_cleavages = get_int_parameter("missed-cleavages");
+//		DIGEST digestion = get_digest_type_parameter("digestion");
+//		ENZYME enzyme_t = get_enzyme_type_parameter("enzyme");
+//		String enzyme = enzyme_type_to_string(enzyme_t);
+//		
+//		if(enzmye == "no-enzyme"){
+//			enzyme = "none";
+//		} else if (digestion != FULL_DIGEST)
+
 		return 0;
 	}
 
@@ -206,7 +259,7 @@ public class TideIndexApplication extends CruxApplication {
 
 	@Override
 	public String getFileStem() {
-		// TODO Auto-generated method stub
+		// TODO Auto-generated method stubFLAGS_tmpfile_prefix
 		return null;
 	}
 
