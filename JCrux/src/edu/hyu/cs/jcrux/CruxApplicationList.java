@@ -1,6 +1,6 @@
 package edu.hyu.cs.jcrux;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 
 /**
  * brief Maintains a list of executable applications.
@@ -13,7 +13,7 @@ public class CruxApplicationList {
 	/**
 	 * The list of applications.
 	 */
-	protected ArrayList<CruxApplication> applications;
+	protected LinkedList<CruxApplication> applications;
 
 	/**
 	 * Name of this list.
