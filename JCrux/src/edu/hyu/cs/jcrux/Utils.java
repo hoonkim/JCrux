@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Random;
 
 public class Utils {
 	// typedef class extends ...
@@ -20,6 +21,9 @@ public class Utils {
 	public static final int IDLENGTH = 256;
 	public static final int PEPTIDELENGTH = 80;
 	public static final int LINELENGTH = 4096;
+
+	private static int mSeed = 1;
+	private static Random mRandom = new Random(mSeed);
 
 	public static int verbosity;
 
@@ -94,4 +98,17 @@ public class Utils {
 		return ct;
 
 	}
+
+	public static void mySRandom(long seed) {
+		mRandom = new Random(seed);
+	}
+
+	public static int myRandom() {
+		return mRandom.nextInt();
+	}
+
+	public static int myRandomLimit(int max) {
+		return myRandom() % max;
+	}
+
 }

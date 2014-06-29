@@ -1,6 +1,15 @@
 package edu.hyu.cs.jcrux;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.PosixParser;
+
+import edu.hyu.cs.flags.Flags;
 
 /**
  * Provides methods for logging error messages, and setting verbosity level.
@@ -56,6 +65,7 @@ public class Carp {
 	private static int mVerbosity;
 
 	private static File logFile = null;
+	private static boolean overwrite = false;
 
 	public static void setVerbosityLevel(int verbosity) {
 		mVerbosity = verbosity;
@@ -74,7 +84,21 @@ public class Carp {
 	 * Parameters must have been processed before calling this function.
 	 */
 	public static void openLogFile(String logFileName[]) {
-		
+		Options options = new Options();
+		options.addOption(null, "output-dir", true, null);
+		options.addOption(null, "overwrite", true, null);
+
+		String outputDir = Flags.getStringParameter("output-dir");
+		if (outputDir == null) {
+			outputDir = "crux-output/";
+		}
+		overwrite = Flags.getBooleanParameter(outputDir);
+
+		if (!outputDir.endsWith("/")) {
+			outputDir += "/";
+		}
+
+		logFile = new File(outputDir + logFileName[0]);
 	}
 
 	/**
@@ -85,7 +109,37 @@ public class Carp {
 	 * @param argv
 	 */
 	public static void logCommandLine(String argv[]) {
+		try {
+			FileOutputStream fileOutputStream = new FileOutputStream(logFile,
+					true);
+			for (int i = 0; i < argv.length; i++) {
+				String buffer = argv[i]
+						+ ((i < (argv.length - 1)) ? " " : "\n");
+				fileOutputStream.write(buffer.getBytes());
+				fileOutputStream.flush();
+			}
+			fileOutputStream.close();
+		} catch (FileNotFoundException e) {
+			System.err.println("Something wrong file not exists");
+		} catch (IOException e) {
+			System.err.println("Error while writing to log file.");
+		}
+	}
 
+	public static void carpPrint(final String string) {
+		try {
+			FileOutputStream fileOutputStream = new FileOutputStream(logFile,
+					true);
+			if (logFile != null) {
+				fileOutputStream.write(string.getBytes());
+				fileOutputStream.flush();
+			}
+			fileOutputStream.close();
+		} catch (FileNotFoundException e) {
+			System.err.println("Something wrong file not exists");
+		} catch (IOException e) {
+			System.err.println("Error while writing to log file.");
+		}
 	}
 
 	/**
@@ -98,8 +152,45 @@ public class Carp {
 	 * 1.
 	 * 
 	 */
-	public static void carp(int verbosity, final String... format) {
-		// TODO 구현.
+	public static void carp(int verbosity, final String str,
+			final Object... format) {
+		if (verbosity <= mVerbosity) {
+			if (logFile != null) {
+				try {
+					FileOutputStream fileOutputStream = new FileOutputStream(
+							logFile, true);
+					if (verbosity == CARP_WARNING) {
+						carpPrint("WARNING: ");
+					} else if (verbosity == CARP_ERROR) {
+						carpPrint("ERROR: ");
+					} else if (verbosity == CARP_FATAL) {
+						carpPrint("FATAL: ");
+					} else if (verbosity == CARP_INFO) {
+						carpPrint("INFO: ");
+					} else if (verbosity == CARP_DETAILED_INFO) {
+						carpPrint("DETAILED INFO: ");
+					} else if (verbosity == CARP_DEBUG) {
+						carpPrint("DEBUG: ");
+					} else if (verbosity == CARP_DETAILED_DEBUG) {
+						carpPrint("DETAILED DEBUG: ");
+					} else {
+						carpPrint("UNKNOWN: ");
+					}
+					String formattedString = String.format(str, format);
+					fileOutputStream.write(formattedString.getBytes());
+					fileOutputStream.flush();
+
+					fileOutputStream.close();
+
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+
+			}
+
+		}
 	}
 
 	public static void warnOnce(final String msg1, final String... msgs) {
@@ -109,9 +200,9 @@ public class Carp {
 	/**
 	 * Print message to log file, just once.// not in java
 	 */
-	public static void carpOnce(int verbosity, final String... msgs) {
-
-		carp(verbosity, msgs);
+	public static void carpOnce(int verbosity, final String msg,
+			final Object... format) {
+		carp(verbosity, msg, format);
 	}
 
 }

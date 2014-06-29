@@ -36,8 +36,7 @@ public class TideSearchApplication extends CruxApplication {
 	}
 
 	@Override
-	public void initialize(String[] argumentList, int numArguments,
-			String[] optionList, int numOption, String[] argv) {
+	public void initialize(String[] optionList, String[] argv) {
 		// TODO Auto-generated method stub
 		
 	}

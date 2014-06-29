@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux;
 
+import edu.hyu.cs.flags.Flags;
 import edu.hyu.cs.jcrux.Objects.COMMAND_T;
 
 /**
@@ -58,9 +59,28 @@ public abstract class CruxApplication {
 	 * @param argv
 	 *            array of command line tokens
 	 */
-	public abstract void initialize(final String argumentList[],
-			final int numArguments, final String optionList[],
-			final int numOption, final String argv[]);
+	public void initialize(final String optionList[], final String argv[]) {
+		Carp.setVerbosityLevel(Carp.CARP_WARNING);
+
+		Flags.intializeParameters(optionList, argv);
+
+		Carp.carp(Carp.CARP_INFO, "Beginning %s", getName());
+
+		if (Flags.getStringParameter("seed").equals("time")) {
+			Utils.mySRandom(System.currentTimeMillis());
+		} else {
+			Utils.mySRandom(Flags.getIntParameter("seed"));
+		}
+		
+		Utils.wallClock();
+		
+		if(needsOutputDirectory()){
+			String outputFolder = Flags.getStringParameter("output-dir");
+			boolean overwrite = Flags.getBooleanParameter("overwrite");
+			
+		}
+		
+	}
 
 	/**
 	 * @return Should this application be kept from the usage statement?

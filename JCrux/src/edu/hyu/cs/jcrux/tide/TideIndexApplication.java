@@ -4,6 +4,8 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import edu.hyu.cs.flags.Flags;
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.CruxApplication;
 import edu.hyu.cs.jcrux.Objects.COMMAND_T;
 import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
@@ -198,9 +200,10 @@ public class TideIndexApplication extends CruxApplication {
 	@Override
 	public int main(String[] argv) {
 
-		final String optionList[] = { "decoy-format", "decoy-prefix", "enzyme",
-				"custom-enzyme", "digestion", "missed-cleavages", "max-length",
-				"max-mass", "min-length", "min-mass", "monoisotopic-precursor",
+		final String optionList[] = { "protein fast file", "index name",
+				"decoy-format", "decoy-prefix", "enzyme", "custom-enzyme",
+				"digestion", "missed-cleavages", "max-length", "max-mass",
+				"min-length", "min-mass", "monoisotopic-precursor",
 				"mods-spec", "cterm-peptide-mods-spec",
 				"nterm-peptide-mods-spec", "cterm-protein-mods-spec",
 				"nterm-protein-mods-spec", "max-mods", "output-dir",
@@ -210,12 +213,7 @@ public class TideIndexApplication extends CruxApplication {
 
 		final String defaultCysteine = "C+57.0214637206";
 
-		// Crux command line parsing
-		int numOptions = optionList.length;
-		final String argList[] = { "protein fast file", "index name" };
-		int numArgs = argList.length;
-
-		initialize(argList, numArgs, optionList, numOptions, argv);
+		initialize(optionList, argv);
 
 		System.out.println("Running tide-index...");
 
@@ -226,27 +224,29 @@ public class TideIndexApplication extends CruxApplication {
 			cmdLine += argv[i];
 		}
 
-		
 		// cmake 명령어 인듯 FLAGS_tmpfile_prefix =
 		// make_file_path("modified_peptides_partial_");
 
 		// Get Options
 
-//		double minMass = getDoubleParameter("min-mass");
-//		double maxMass = getDoubleParameter("max-mass");
-//		int minLength = getIntParameter("min-length");
-//		int maxLength = getIntParameter("max-length");
-//		boolean monoisotopicPrecursor = getBooleanParameter("monoisotopic-precursor");
-//		// FLAGSMaxMods = get_int_parameter("max-mods");
-//		MASS_TYPE mass_type = (monoisotopicPrecursor) ? MONO : AVERAGE;
-//		int missed_cleavages = get_int_parameter("missed-cleavages");
-//		DIGEST digestion = get_digest_type_parameter("digestion");
-//		ENZYME enzyme_t = get_enzyme_type_parameter("enzyme");
-//		String enzyme = enzyme_type_to_string(enzyme_t);
-//		
-//		if(enzmye == "no-enzyme"){
-//			enzyme = "none";
-//		} else if (digestion != FULL_DIGEST)
+		double minMass = Flags.getDoubleParameter("min-mass");
+		double maxMass = Flags.getDoubleParameter("max-mass");
+		int minLength = Flags.getIntParameter("min-length");
+		int maxLength = Flags.getIntParameter("max-length");
+		boolean monoisotopicPrecursor = Flags
+				.getBooleanParameter("monoisotopic-precursor");
+		Flags.MaxMods = Flags.getIntParameter("max-mods");
+		MASS_TYPE mass_type = (monoisotopicPrecursor) ? MASS_TYPE.MONO
+				: MASS_TYPE.AVERAGE;
+		int missedCleavages = Flags.getIntParameter("missed-cleavages");
+		DIGEST digestion = Flags.getDigestParameter("digestion");
+		ENZYME enzyme = Flags.getEnzymeParameter("enzyme");
+
+		if ((digestion != DIGEST.FULL_DIGEST)
+				|| (digestion != DIGEST.PARTIAL_DIGEST)) {
+			Carp.carp(Carp.CARP_FATAL,
+					"'digestion' must be 'full-digest' or 'partial-digest'");
+		}
 
 		return 0;
 	}
@@ -276,8 +276,7 @@ public class TideIndexApplication extends CruxApplication {
 	}
 
 	@Override
-	public void initialize(String[] argumentList, int numArguments,
-			String[] optionList, int numOption, String[] argv) {
+	public void initialize(String[] optionList, String[] argv) {
 		// TODO Auto-generated method stub
 
 	}
