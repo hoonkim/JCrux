@@ -1,9 +1,11 @@
 package edu.hyu.cs.jcrux.tide;
 
-import java.lang.invoke.SwitchPoint;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import edu.hyu.cs.pb.HeaderPB.ModTable;
 import edu.hyu.cs.pb.HeaderPB.Modification;
@@ -33,7 +35,7 @@ public class VariableModTable {
 	private IntPairVec mPossiblesNtpr[] = new IntPairVec[256];
 
 	private LinkedList<Double> mUniqueDelta, mOriginalDeltas;
-	private LinkedList<Integer> maxCounts;
+	private LinkedList<Integer> mMaxCounts;
 	private int mOffset;
 	private ModCoder mCoder;
 
@@ -41,7 +43,7 @@ public class VariableModTable {
 	private ModTable mPbNtpepModTable;
 	private ModTable mPbCtpepModTable;
 	private ModTable mPbNtproModTable;
-	private ModTable mPbCtrpoModTable;
+	private ModTable mPbCtproModTable;
 
 	public static enum MODS_SPEC_TYPE {
 		MOD_SPEC, // table for regular amino acid modifications
@@ -53,6 +55,10 @@ public class VariableModTable {
 
 	public VariableModTable() {
 		mOffset = 0;
+		mUniqueDelta = new LinkedList<Double>();
+		mMaxCounts = new LinkedList<Integer>();
+		mCoder = new ModCoder();
+
 	}
 
 	public boolean Init(final ModTable pbModTable) {
@@ -74,7 +80,7 @@ public class VariableModTable {
 			possibles = mPossiblesNtpr;
 		}
 
-		if (pbModTable == mPbCtrpoModTable) {
+		if (pbModTable == mPbCtproModTable) {
 			possibles = mPossiblesCtpr;
 		}
 
@@ -145,21 +151,254 @@ public class VariableModTable {
 			// TODO 이부분 왠지 제작자가 실수한것 같습니다.
 			// 본래 소스는
 			// pbModTable = mPbNtproModTable;
-			pbModTable = mPbCtrpoModTable;
+			pbModTable = mPbCtproModTable;
 			break;
 		}
 		if (pbModTable == null) {
 			return false;
 		}
 
-		int post = 0;
-		// TODO 밑에 구현.
+		/*
+		 * 이부분은 java와 C++의 Protocol Buffer에서 오는 차이 때문에 거의 새롭게 구현함.
+		 */
+
+		ModTable.Builder modTableBuilder = ModTable.newBuilder(pbModTable);
+
+		Pattern pattern = Pattern
+				.compile("[0-9]*[ACDEFGHIKLMNPQRSTVWY]+[+-]*[0-9.]+");
+
+		Pattern pattern2 = Pattern.compile("[ACDEFGHIKLMNPQRSTVWY]+");
+		Matcher matcher = pattern.matcher(specText);
+		while (matcher.find()) {
+
+			String str = matcher.group();
+
+			int limit = 0;
+			String aa;
+
+			char plus;
+			double delta;
+
+			Matcher matcher2 = pattern2.matcher(str);
+			if (matcher2.find()) {
+
+				if (str.length() > 0 && Character.isDigit(str.charAt(0))) {
+					limit = Integer
+							.parseInt(str.substring(0, matcher2.start()));
+				}
+
+				aa = str.substring(matcher2.start(), matcher2.end());
+
+				delta = Double.parseDouble(str.substring(matcher2.end() + 2,
+						str.length()));
+
+				plus = str.charAt(matcher2.end());
+
+				if (plus == '-') {
+					delta *= -1;
+				}
+				Modification.Builder modification = Modification.newBuilder();
+
+				modification.setAminoAcids(aa);
+				modification.setDelta(delta);
+
+				if (limit > 1 && (modTable != MODS_SPEC_TYPE.MOD_SPEC)) {
+					limit = 1;
+
+				}
+				if (limit == 0 && (modTable == MODS_SPEC_TYPE.MOD_SPEC)) {
+					modTableBuilder.addStaticMod(modification);
+				} else {
+					modification.setMaxCount(limit);
+					modTableBuilder.addVariableMod(modification);
+					mUniqueDelta.addLast(delta);
+					mMaxCounts.addLast(limit);
+				}
+
+			}
+
+		}
+
+		switch (modTable) {
+		case MOD_SPEC:
+			mPbModTable = modTableBuilder.build();
+			break;
+		case NTPEP:
+			mPbNtpepModTable = modTableBuilder.build();
+			break;
+		case CTPEP:
+			mPbCtpepModTable = modTableBuilder.build();
+			break;
+		case NTPRO:
+			mPbNtproModTable = modTableBuilder.build();
+			break;
+		case CTPRO:
+			mPbCtproModTable = modTableBuilder.build();
+			break;
+		}
 
 		return true;
+	}
+
+	void clearTables() {
+		mPbModTable = ModTable.newBuilder(mPbModTable).clear().build();
+		mPbNtpepModTable = ModTable.newBuilder(mPbNtpepModTable).clear()
+				.build();
+		mPbCtpepModTable = ModTable.newBuilder(mPbCtpepModTable).clear()
+				.build();
+		mPbNtproModTable = ModTable.newBuilder(mPbNtproModTable).clear()
+				.build();
+		mPbCtproModTable = ModTable.newBuilder(mPbCtproModTable).clear()
+				.build();
+	}
+
+	int numPoss(char aa, MODS_SPEC_TYPE modTable) {
+		if (modTable == null) {
+			modTable = MODS_SPEC_TYPE.MOD_SPEC;
+		}
+		switch (modTable) {
+		case MOD_SPEC:
+			return mPossibles[aa].size();
+		case NTPEP:
+			return mPossiblesNtpe[aa].size();
+		case CTPEP:
+			return mPossiblesCtpe[aa].size();
+		case NTPRO:
+			return mPossiblesNtpr[aa].size();
+		case CTPRO:
+			return mPossiblesCtpr[aa].size();
+		}
+		return 0;
+	}
+
+	int possMaxCt(char aa, int index, MODS_SPEC_TYPE modTable) {
+		if (modTable == null) {
+			modTable = MODS_SPEC_TYPE.MOD_SPEC;
+		}
+		switch (modTable) {
+		case MOD_SPEC:
+			return mPossibles[aa].get(index).second;
+		case NTPEP:
+			return mPossiblesNtpe[aa].get(index).second;
+		case CTPEP:
+			return mPossiblesCtpe[aa].get(index).second;
+		case NTPRO:
+			return mPossiblesNtpr[aa].get(index).second;
+		case CTPRO:
+			return mPossiblesCtpr[aa].get(index).second;
+		}
+		return 0;
+	}
+
+	int possDeltIx(char aa, int index, MODS_SPEC_TYPE modTable) {
+		if (modTable == null) {
+			modTable = MODS_SPEC_TYPE.MOD_SPEC;
+		}
+		switch (modTable) {
+		case MOD_SPEC:
+			return mPossibles[aa].get(index).first;
+		case NTPEP:
+			return mPossiblesNtpe[aa].get(index).first;
+		case CTPEP:
+			return mPossiblesCtpe[aa].get(index).first;
+		case NTPRO:
+			return mPossiblesNtpr[aa].get(index).first;
+		case CTPRO:
+			return mPossiblesCtpr[aa].get(index).first;
+		}
+		return 0;
+	}
+
+	double possDelta(char aa, int index) {
+		return mUniqueDelta.get(possDeltIx(aa, index, null));
+	}
+
+	boolean serializeUniqueDeltas() {
+		if (mUniqueDelta.size() == 0) {
+			return false;
+		}
+		mOriginalDeltas = new LinkedList<Double>(mUniqueDelta);
+
+		LinkedHashSet<Double> temp = new LinkedHashSet<Double>(mUniqueDelta);
+		mUniqueDelta = new LinkedList<Double>(temp);
+		mCoder.init(mUniqueDelta.size());
+
+		Init(mPbModTable);
+		Init(mPbCtpepModTable);
+		Init(mPbNtpepModTable);
+		Init(mPbCtproModTable);
+		Init(mPbNtproModTable);
+
+		return true;
+	}
+
+	boolean serializeUniqueDeltas(ModTable pbModTable, MODS_SPEC_TYPE modTable) {
+
+		if (pbModTable.getUniqueDeltasCount() == 0) {
+			ModTable.Builder modTableBuilder = ModTable.newBuilder(pbModTable);
+			for (double delta : mUniqueDelta) {
+				modTableBuilder.addUniqueDeltas(delta);
+			}
+			switch (modTable) {
+			case MOD_SPEC:
+				mPbModTable = modTableBuilder.build();
+				break;
+			case NTPEP:
+				mPbNtpepModTable = modTableBuilder.build();
+				break;
+			case CTPEP:
+				mPbCtpepModTable = modTableBuilder.build();
+				break;
+			case NTPRO:
+				mPbNtproModTable = modTableBuilder.build();
+				break;
+			case CTPRO:
+				mPbCtproModTable = modTableBuilder.build();
+				break;
+			}
+
+			return true;
+		}
+		if (pbModTable.getUniqueDeltasCount() != mUniqueDelta.size()) {
+			return false;
+		}
+		for (int i = 0; i < mUniqueDelta.size(); ++i) {
+			if (mUniqueDelta.get(i) != pbModTable.getUniqueDeltas(i)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	ModTable parsedModTable() {
+		return mPbModTable;
+	}
+
+	LinkedList<Integer> maxCounts() {
+		return mMaxCounts;
+	}
+
+	LinkedList<Double> originalDeltas() {
+		return mOriginalDeltas;
+	}
+
+	int encodeMod(int aaIndex, int uniqueDeltaIndex) {
+		return mCoder.encodeMod(aaIndex, uniqueDeltaIndex);
+	}
+
+	// TODO show 구현 디버그용이라 안함.
+
+	// void show () {
+	// }
+
+	int uniqueDeltaSize() {
+		return mUniqueDelta.size();
 	}
 
 	static boolean isAA(char c) {
 		final String AA = "ACDEFGHIKLMNPQRSTVWYX";
 		return AA.contains(Character.toString(c));
+
 	}
 }
