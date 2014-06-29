@@ -241,15 +241,11 @@ public class VariableModTable {
 	}
 
 	void clearTables() {
-		mPbModTable = ModTable.newBuilder(mPbModTable).clear().build();
-		mPbNtpepModTable = ModTable.newBuilder(mPbNtpepModTable).clear()
-				.build();
-		mPbCtpepModTable = ModTable.newBuilder(mPbCtpepModTable).clear()
-				.build();
-		mPbNtproModTable = ModTable.newBuilder(mPbNtproModTable).clear()
-				.build();
-		mPbCtproModTable = ModTable.newBuilder(mPbCtproModTable).clear()
-				.build();
+		mPbModTable = ModTable.newBuilder().clear().build();
+		mPbNtpepModTable = ModTable.newBuilder().clear().build();
+		mPbCtpepModTable = ModTable.newBuilder().clear().build();
+		mPbNtproModTable = ModTable.newBuilder().clear().build();
+		mPbCtproModTable = ModTable.newBuilder().clear().build();
 	}
 
 	int numPoss(char aa, MODS_SPEC_TYPE modTable) {

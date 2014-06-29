@@ -51,7 +51,7 @@ public class MassConstants {
 	private static double[] uniqueDeltas;
 	private static double[] uniqueDeltasBin;
 
-	boolean init(final ModTable modTable) {
+	public static boolean init(final ModTable modTable) {
 		if (modTable != null && checkModTable(modTable)) {
 			return false;
 		}

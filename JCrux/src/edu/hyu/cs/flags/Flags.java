@@ -8,6 +8,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 
+import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
 import edu.hyu.cs.jcrux.Objects.ENZYME;
 
@@ -74,5 +75,11 @@ public class Flags {
 			return (bool.toUpperCase(Locale.US).equals("T")) ? true : false;
 		}
 		return false;
+	}
+
+	public static DECOY_TYPE getTideDecoyTypeParameter(final String option) {
+		// TODO 여기도 기본 셔플 디코이.
+		return DECOY_TYPE.PEPTIDE_SHUFFLE_DECOYS;
+
 	}
 }

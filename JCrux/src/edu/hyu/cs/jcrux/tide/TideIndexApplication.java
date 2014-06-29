@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux.tide;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
 import edu.hyu.cs.jcrux.Objects.ENZYME;
 import edu.hyu.cs.jcrux.Objects.MASS_TYPE;
+import edu.hyu.cs.jcrux.tide.VariableModTable.MODS_SPEC_TYPE;
 import edu.hyu.cs.jcrux.Peptide;
 import edu.hyu.cs.jcrux.Protein;
 import edu.hyu.cs.pb.HeaderPB.Header;
@@ -200,10 +202,9 @@ public class TideIndexApplication extends CruxApplication {
 	@Override
 	public int main(String[] argv) {
 
-		final String optionList[] = { "protein fast file", "index name",
-				"decoy-format", "decoy-prefix", "enzyme", "custom-enzyme",
-				"digestion", "missed-cleavages", "max-length", "max-mass",
-				"min-length", "min-mass", "monoisotopic-precursor",
+		final String optionList[] = { "decoy-format", "decoy-prefix", "enzyme",
+				"custom-enzyme", "digestion", "missed-cleavages", "max-length",
+				"max-mass", "min-length", "min-mass", "monoisotopic-precursor",
 				"mods-spec", "cterm-peptide-mods-spec",
 				"nterm-peptide-mods-spec", "cterm-protein-mods-spec",
 				"nterm-protein-mods-spec", "max-mods", "output-dir",
@@ -246,6 +247,83 @@ public class TideIndexApplication extends CruxApplication {
 				|| (digestion != DIGEST.PARTIAL_DIGEST)) {
 			Carp.carp(Carp.CARP_FATAL,
 					"'digestion' must be 'full-digest' or 'partial-digest'");
+		}
+
+		VariableModTable varModTable = new VariableModTable();
+		String modsSpec;
+		varModTable.clearTables();
+
+		modsSpec = Flags.getStringParameter("mods-spec");
+		if (modsSpec == null || !modsSpec.contains("C")) {
+			modsSpec = (modsSpec == null) ? defaultCysteine : defaultCysteine
+					+ "," + modsSpec;
+			Carp.carp(Carp.CARP_DEBUG,
+					"Using default cysteine mod '%s' ('%s')", defaultCysteine,
+					modsSpec);
+		}
+		if (!varModTable.parse(modsSpec, null)) {
+			Carp.carp(Carp.CARP_FATAL, "Error parsing mods");
+		}
+
+		modsSpec = Flags.getStringParameter("cterm-peptide-mods-spec");
+		if (modsSpec != null) {
+			if (!varModTable.parse(modsSpec, MODS_SPEC_TYPE.CTPEP)) {
+				Carp.carp(Carp.CARP_FATAL,
+						"Error parsing c-terminal peptide mods");
+			}
+		}
+		modsSpec = Flags.getStringParameter("nterm-peptide-mods-spec");
+		if (modsSpec != null) {
+			if (!varModTable.parse(modsSpec, MODS_SPEC_TYPE.NTPEP)) {
+				Carp.carp(Carp.CARP_FATAL,
+						"Error parsing n-terminal peptide mods");
+			}
+		}
+		modsSpec = Flags.getStringParameter("cterm-protein-mods-spec");
+		if (modsSpec != null) {
+			if (!varModTable.parse(modsSpec, MODS_SPEC_TYPE.CTPRO)) {
+				Carp.carp(Carp.CARP_FATAL,
+						"Error parsing c-terminal protein mods");
+			}
+		}
+		modsSpec = Flags.getStringParameter("nterm-protein-mods-spec");
+		if (modsSpec != null) {
+			if (!varModTable.parse(modsSpec, MODS_SPEC_TYPE.NTPRO)) {
+				Carp.carp(Carp.CARP_FATAL,
+						"Error parsing n-terminal protein mods");
+			}
+		}
+
+		varModTable.serializeUniqueDeltas();
+
+		if (!MassConstants.init(varModTable.parsedModTable())) {
+			Carp.carp(Carp.CARP_FATAL, "Error in MassConstants::Init");
+		}
+
+		// 148
+
+		DECOY_TYPE decoyType = Flags.getTideDecoyTypeParameter("decoy-foramt");
+		String decoyPrefix = Flags.getStringParameter("decoy-prefix");
+
+		String fasta = argv[argv.length - 2];
+		String index = argv[argv.length - 1];
+		boolean overwrite = Flags.getBooleanParameter("overwrite");
+
+		if (!new File(fasta).exists()) {
+			Carp.carp(Carp.CARP_FATAL, "Fasta file %s does not exist", fasta);
+		}
+		
+		String outProteins = index + "/" + "protix";
+		String outPeptides = index + "/" + "pepix";
+		String outAux = index + "/" + "auxlocs";
+		String modlessPeptides = outPeptides + ".nomods.tmp";
+		String peaklessPeptides = outPeptides + ".nopeaks.tmp";
+		
+		FileOutputStream outTargetList = null;
+		FileOutputStream outDecoyList = null;
+		
+		if(Flags.getBooleanParameter("peptide-list")) {
+			outTargetList = new FileOutputStream(new File(""))
 		}
 
 		return 0;
