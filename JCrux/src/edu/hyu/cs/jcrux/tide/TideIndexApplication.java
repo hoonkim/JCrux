@@ -8,14 +8,15 @@ import java.util.HashMap;
 import edu.hyu.cs.flags.Flags;
 import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.CruxApplication;
+import edu.hyu.cs.jcrux.CruxUtils;
 import edu.hyu.cs.jcrux.Objects.COMMAND_T;
 import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
 import edu.hyu.cs.jcrux.Objects.ENZYME;
 import edu.hyu.cs.jcrux.Objects.MASS_TYPE;
-import edu.hyu.cs.jcrux.tide.VariableModTable.MODS_SPEC_TYPE;
 import edu.hyu.cs.jcrux.Peptide;
 import edu.hyu.cs.jcrux.Protein;
+import edu.hyu.cs.jcrux.tide.VariableModTable.MODS_SPEC_TYPE;
 import edu.hyu.cs.pb.HeaderPB.Header;
 import edu.hyu.cs.pb.PeptidesPB.AuxLocation;
 
@@ -312,19 +313,34 @@ public class TideIndexApplication extends CruxApplication {
 		if (!new File(fasta).exists()) {
 			Carp.carp(Carp.CARP_FATAL, "Fasta file %s does not exist", fasta);
 		}
-		
+
 		String outProteins = index + "/" + "protix";
 		String outPeptides = index + "/" + "pepix";
 		String outAux = index + "/" + "auxlocs";
 		String modlessPeptides = outPeptides + ".nomods.tmp";
 		String peaklessPeptides = outPeptides + ".nopeaks.tmp";
-		
+
 		FileOutputStream outTargetList = null;
 		FileOutputStream outDecoyList = null;
-		
-		if(Flags.getBooleanParameter("peptide-list")) {
-			outTargetList = new FileOutputStream(new File(""))
+
+		if (Flags.getBooleanParameter("peptide-list")) {
+			outTargetList = CruxUtils.createStreamInPath(
+					CruxUtils.makeFilePath("tide-index.decoy.fasta"), null,
+					overwrite);
+			if (decoyType != DECOY_TYPE.NO_DECOYS) {
+				outDecoyList = CruxUtils
+						.createStreamInPath(CruxUtils
+								.makeFilePath("tide-index.peptides.decoy.txt"),
+								null, overwrite);
+			}
 		}
+
+//		FileOutputStream outDecoyFasta = GenerateDecoys
+//				.canGenerateDecoyProteins() ? CruxUtils.createStreamInPath(
+//				CruxUtils.makeFilePath("tide-index.decoy.fasta"), null,
+//				overwrite) : null;
+	
+				
 
 		return 0;
 	}
