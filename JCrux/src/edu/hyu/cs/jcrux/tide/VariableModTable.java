@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.pb.HeaderPB.ModTable;
 import edu.hyu.cs.pb.HeaderPB.Modification;
 import edu.hyu.cs.types.Pair;
@@ -202,11 +203,15 @@ public class VariableModTable {
 				modification.setAminoAcids(aa);
 				modification.setDelta(delta);
 
+				
+				
 				if (limit > 1 && (modTable != MODS_SPEC_TYPE.MOD_SPEC)) {
 					limit = 1;
 
 				}
 				if (limit == 0 && (modTable == MODS_SPEC_TYPE.MOD_SPEC)) {
+					
+					
 					modTableBuilder.addStaticMod(modification);
 				} else {
 					modification.setMaxCount(limit);
@@ -324,7 +329,7 @@ public class VariableModTable {
 		Init(mPbNtpepModTable);
 		Init(mPbCtproModTable);
 		Init(mPbNtproModTable);
-
+		
 		return true;
 	}
 
@@ -363,6 +368,8 @@ public class VariableModTable {
 				return false;
 			}
 		}
+
+	
 
 		return true;
 	}

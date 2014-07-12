@@ -17,6 +17,7 @@ public class Flags {
 	private static Options options;
 	private static CommandLine line;
 	public static int MaxMods;
+	public static String tmpFilePrefix;
 
 	public static void intializeParameters(final String optionList[],
 			String argv[]) {

@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 
 /**
@@ -13,12 +14,12 @@ public class CruxApplicationList {
 	/**
 	 * The list of applications.
 	 */
-	protected LinkedList<CruxApplication> applications;
+	protected LinkedList<CruxApplication> mApplications;
 
 	/**
 	 * Name of this list.
 	 */
-	protected String listName;
+	protected String mListName;
 
 	/**
 	 * 
@@ -28,7 +29,8 @@ public class CruxApplicationList {
 	 *            리스트 이름.
 	 */
 	public CruxApplicationList(final String listName) {
-		// @Todo 구현.
+		mListName = listName;
+		mApplications = new LinkedList<CruxApplication>();
 	}
 
 	/**
@@ -38,7 +40,11 @@ public class CruxApplicationList {
 	 *            추가할 어플리 케이션.
 	 */
 	public void add(final CruxApplication application) {
-		// @Todo 구현.
+		if (find(application.getName()) != null) {
+			Carp.carp(Carp.CARP_FATAL, "Name clash! %s", application.getName());
+		}
+
+		mApplications.addLast(application);
 	}
 
 	/**
@@ -60,8 +66,16 @@ public class CruxApplicationList {
 	 * @return application. null if not found.
 	 */
 	public CruxApplication find(final String appName) {
-		// @Todo 구현.
-		return null;
+		CruxApplication cruxApplication = null;
+
+		for (CruxApplication app : mApplications) {
+			if (appName.equals(app.getName())) {
+				cruxApplication = app;
+				break;
+			}
+		}
+
+		return cruxApplication;
 	}
 
 	/**
@@ -70,7 +84,12 @@ public class CruxApplicationList {
 	 * main method with the rest of the parameters.
 	 */
 	public void usage() {
-		// @Todo 구현.
+		int maxNameLength = 0;
+		for (CruxApplication app : mApplications) {
+			maxNameLength = (maxNameLength > app.getName().length()) ? maxNameLength
+					: app.getName().length();
+		}
+		System.err.println("사용법을 숙지하세요!");
 	}
 
 	/**
@@ -83,8 +102,24 @@ public class CruxApplicationList {
 	 * @return 종료시그널.
 	 */
 	public int main(String args[]) {
-		// @Todo 구현.
-		return 0;
+		if (args.length < 1) {
+			usage();
+			return -1;
+		}
+
+		String appName = args[0];
+		CruxApplication cruxApplication = find(appName);
+
+		if (cruxApplication == null) {
+			System.err.printf("Cannot fubd %s in availbale applications\n",
+					appName);
+			usage();
+			return -1;
+		}
+
+		int ret = cruxApplication.main(args);
+
+		return ret;
 	}
 
 }

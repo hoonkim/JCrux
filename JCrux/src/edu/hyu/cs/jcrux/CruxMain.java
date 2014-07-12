@@ -24,8 +24,11 @@ public class CruxMain {
 	public static void main(String args[]) {
 		CruxApplicationList applications = new CruxApplicationList("crux");
 
+		
 		applications.add(new TideIndexApplication());
 		applications.add(new TideSearchApplication());
+		
+		
 
 		applications.main(args);
 

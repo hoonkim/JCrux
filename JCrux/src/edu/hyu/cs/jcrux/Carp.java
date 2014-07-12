@@ -3,11 +3,10 @@ package edu.hyu.cs.jcrux;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 
-import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 
 import edu.hyu.cs.flags.Flags;
 
@@ -65,6 +64,9 @@ public class Carp {
 	private static int mVerbosity;
 
 	private static File logFile = null;
+
+	private static FileWriter writer = null;
+
 	private static boolean overwrite = false;
 
 	public static void setVerbosityLevel(int verbosity) {
@@ -83,7 +85,7 @@ public class Carp {
 	 * 
 	 * Parameters must have been processed before calling this function.
 	 */
-	public static void openLogFile(String logFileName[]) {
+	public static void openLogFile(String logFileName) {
 		Options options = new Options();
 		options.addOption(null, "output-dir", true, null);
 		options.addOption(null, "overwrite", true, null);
@@ -98,7 +100,16 @@ public class Carp {
 			outputDir += "/";
 		}
 
-		logFile = new File(outputDir + logFileName[0]);
+		CruxUtils.createOutputDirectory(outputDir, true);
+
+		logFile = new File(outputDir + logFileName);
+		if (!logFile.exists()) {
+			try {
+				logFile.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -128,6 +139,7 @@ public class Carp {
 
 	public static void carpPrint(final String string) {
 		try {
+
 			FileOutputStream fileOutputStream = new FileOutputStream(logFile,
 					true);
 			if (logFile != null) {
@@ -154,7 +166,11 @@ public class Carp {
 	 */
 	public static void carp(int verbosity, final String str,
 			final Object... format) {
+
 		if (verbosity <= mVerbosity) {
+			String formattedString = String.format(str, format);
+
+			System.err.println(formattedString);
 			if (logFile != null) {
 				try {
 					FileOutputStream fileOutputStream = new FileOutputStream(
@@ -176,11 +192,14 @@ public class Carp {
 					} else {
 						carpPrint("UNKNOWN: ");
 					}
-					String formattedString = String.format(str, format);
+
 					fileOutputStream.write(formattedString.getBytes());
 					fileOutputStream.flush();
 
 					fileOutputStream.close();
+					if (verbosity == CARP_FATAL) {
+						System.exit(1);
+					}
 
 				} catch (FileNotFoundException e) {
 					e.printStackTrace();

@@ -1,6 +1,6 @@
 package edu.hyu.cs.jcrux.tide;
 
-import edu.hyu.cs.jcrux.Objects.MOD_POSITION;
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.pb.HeaderPB.ModTable;
 import edu.hyu.cs.pb.HeaderPB.Modification;
 
@@ -8,10 +8,10 @@ public class MassConstants {
 	public static final double PROTON = 1.00727646688;
 	public static final double BIN_WDITH = 1.0005079;
 
-	public static double MONO_TABLE[];
-	public static double AVG_TABLE[];
-	public static double AA_BIN1[];
-	public static double AA_BIN2[];
+	public static double MONO_TABLE[] = new double[256];
+	public static double AVG_TABLE[] = new double[256];
+	public static double AA_BIN1[] = new double[256];
+	public static double AA_BIN2[] = new double[256];
 
 	public static double ELTS_MONO[] = { 1.007825035, // H
 			12.0, // C
@@ -36,8 +36,8 @@ public class MassConstants {
 	public static final double MONO_NH3 = 3 * ELTS_MONO[0] + ELTS_MONO[2];
 	public static final double MONO_CO = ELTS_MONO[1] + ELTS_MONO[3];
 
-	static public int FIXP_MONO_TABLE[];
-	static public int FIXP_AVG_TABLE[];
+	static public int FIXP_MONO_TABLE[] = new int[256];
+	static public int FIXP_AVG_TABLE[] = new int[256];
 
 	static public int FIXP_MONO_H2O;
 	static public int FIXP_AVG_H2O;
@@ -72,8 +72,11 @@ public class MassConstants {
 				AVG_TABLE[aa] += delta;
 			}
 			// carp
-			System.out.printf("Number of unique modification masses : %d\n",
+			Carp.carp(Carp.CARP_DEBUG,
+					"Number of unique modification masses: %d\n",
 					modTable.getUniqueDeltasCount());
+
+			modCoder = new ModCoder();
 
 			modCoder.init(modTable.getUniqueDeltasCount());
 			uniqueDeltas = new double[modTable.getUniqueDeltasCount()];

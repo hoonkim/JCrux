@@ -13,8 +13,7 @@ public class TideSearchApplication extends CruxApplication {
 
 	@Override
 	public String getName() {
-		// TODO Auto-generated method stub
-		return null;
+		return "tide-search";
 	}
 
 	@Override
