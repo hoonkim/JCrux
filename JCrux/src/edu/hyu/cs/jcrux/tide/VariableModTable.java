@@ -65,23 +65,29 @@ public class VariableModTable {
 	public boolean Init(final ModTable pbModTable) {
 		IntPairVec possibles[] = null;
 
+		System.out.println("H0");
 		if (pbModTable == mPbModTable) {
+			System.out.println("H1");
 			possibles = mPossibles;
 		}
 
 		if (pbModTable == mPbNtpepModTable) {
+			System.out.println("H2");
 			possibles = mPossiblesNtpe;
 		}
 
 		if (pbModTable == mPbCtpepModTable) {
+			System.out.println("H3");
 			possibles = mPossiblesCtpe;
 		}
 
 		if (pbModTable == mPbNtproModTable) {
+			System.out.println("H4");
 			possibles = mPossiblesNtpr;
 		}
 
 		if (pbModTable == mPbCtproModTable) {
+			System.out.println("H5");
 			possibles = mPossiblesCtpr;
 		}
 
@@ -207,7 +213,6 @@ public class VariableModTable {
 				
 				if (limit > 1 && (modTable != MODS_SPEC_TYPE.MOD_SPEC)) {
 					limit = 1;
-
 				}
 				if (limit == 0 && (modTable == MODS_SPEC_TYPE.MOD_SPEC)) {
 					

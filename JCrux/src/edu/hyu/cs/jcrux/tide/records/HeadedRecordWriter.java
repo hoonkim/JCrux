@@ -48,7 +48,10 @@ public class HeadedRecordWriter {
 	}
 
 	public boolean write(final Message message) {
-		System.out.println(mWriter == null);
 		return mWriter.write(message);
+	}
+	
+	public boolean finish(){
+		return mWriter.finish();
 	}
 }

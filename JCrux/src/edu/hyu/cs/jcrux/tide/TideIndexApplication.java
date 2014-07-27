@@ -6,8 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.PushbackReader;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -21,12 +20,16 @@ import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
 import edu.hyu.cs.jcrux.Objects.ENZYME;
 import edu.hyu.cs.jcrux.Objects.MASS_TYPE;
-import edu.hyu.cs.jcrux.Peptide;
 import edu.hyu.cs.jcrux.ProteinPeptideIterator;
 import edu.hyu.cs.jcrux.tide.VariableModTable.MODS_SPEC_TYPE;
+import edu.hyu.cs.jcrux.tide.records.HeadedRecordReader;
 import edu.hyu.cs.jcrux.tide.records.HeadedRecordWriter;
 import edu.hyu.cs.pb.HeaderPB.Header;
+import edu.hyu.cs.pb.HeaderPB.Header.PeptidesHeader;
+import edu.hyu.cs.pb.HeaderPB.ModTable;
 import edu.hyu.cs.pb.PeptidesPB.AuxLocation;
+import edu.hyu.cs.pb.PeptidesPB.Location;
+import edu.hyu.cs.pb.PeptidesPB.Peptide;
 import edu.hyu.cs.pb.RawProteinsPB.Protein;
 import edu.hyu.cs.types.Pair;
 import edu.hyu.cs.types.Pair2;
@@ -46,7 +49,7 @@ public class TideIndexApplication extends CruxApplication {
 	 * @author HoonKim
 	 * 
 	 */
-	protected class TideIndexPeptide {
+	protected class TideIndexPeptide implements Comparable<TideIndexPeptide> {
 		private double mMass;
 		private int mLength;
 		private int mProteinId;
@@ -121,19 +124,26 @@ public class TideIndexApplication extends CruxApplication {
 					&& mLength == peptide.getLength() && mResidues
 						.equals(peptide.getSequence()));
 		}
+
+		@Override
+		public int compareTo(TideIndexPeptide peptide) {
+			if (isBigger(peptide))
+				return -1;
+			else if (isEqual(peptide)) {
+				return 0;
+			} else {
+				return 1;
+			}
+		}
 	}
 
 	/**
 	 * Sequence, start location
 	 */
-	private class PeptideInfo extends Pair2<String, Integer> {
+	private class PeptideInfo extends Pair<String, Integer> {
 
 		protected PeptideInfo(String first, int second) {
 			super(first, second);
-		}
-
-		private PeptideInfo() {
-			super();
 		}
 
 	}
@@ -231,10 +241,9 @@ public class TideIndexApplication extends CruxApplication {
 
 		while (getNextProtein(fastaStream, proteinNameAndSequence)) {
 
-			System.out.println(curProtein + 1);
 			outProteinSequences.addLast(proteinNameAndSequence.second);
 
-			String proteinName = proteinNameAndSequence.first;
+			String proteinName = proteinNameAndSequence.first.split("[ \t\n]")[0];
 			String proteinSequence = proteinNameAndSequence.second;
 
 			ProteinInfo proteinInfoTemp = new ProteinInfo(proteinName,
@@ -250,14 +259,48 @@ public class TideIndexApplication extends CruxApplication {
 			LinkedList<PeptideInfo> cleavedPeptides = cleavedPeptideInfo
 					.getLast().second;
 
+			// Write pb::Protein
 			getPbProtein(++curProtein, proteinName, proteinSequence,
 					pbProteinBuilder);
-			proteinWriter.write(pbProteinBuilder.build());
+			Protein protein = pbProteinBuilder.build();
+			proteinWriter.write(protein);
 			cleaveProtein(proteinSequence, enzyme, digestion, missedCleavages,
 					minLength, maxLength, cleavedPeptides);
-		}
 
-		// TODO 442
+			for (int i = 0; i < cleavedPeptides.size();) {
+				String cleavedSequence = cleavedPeptides.get(i).first;
+				double pepMass = calcPepMassTide(cleavedSequence, massType);
+
+				if (pepMass < 0.0) {
+					Carp.carp(
+							Carp.CARP_WARNING,
+							"Ignoring invalid sequence <%s> who has pepMass <%.5f>",
+							cleavedSequence, pepMass);
+					cleavedPeptides.remove(i);
+					continue;
+				} else if (pepMass < minMass || pepMass > maxMass) {
+					++i;
+					continue;
+				}
+				int startLoc = cleavedPeptides.get(i).second;
+				int pepLen = cleavedSequence.length();
+				// Add target to heap
+
+				TideIndexPeptide pepTarget = new TideIndexPeptide(pepMass,
+						pepLen, proteinSequence, curProtein, startLoc, false);
+				outPeptideHeap.addLast(pepTarget);
+
+				// FIXME ?? 이부분 이상함.
+				++targetGenerated;
+				++i;
+
+			}
+
+		}
+		proteinWriter.finish();
+		Collections.sort(outPeptideHeap);
+
+		Carp.carp(Carp.CARP_DEBUG, "FASTA produced %d targets", targetGenerated);
 
 	}
 
@@ -330,7 +373,7 @@ public class TideIndexApplication extends CruxApplication {
 
 		outPeptides.clear();
 
-		if (enzyme == ENZYME.NO_ENZYME) {
+		if (enzyme != ENZYME.NO_ENZYME) {
 			int pepStart = 0, nextPepStart = 0;
 			int cleaveSites = 0;
 			for (int i = 0; i < sequence.length(); i++) {
@@ -343,17 +386,17 @@ public class TideIndexApplication extends CruxApplication {
 					// Partial digestion (not last AA or cleavage position), add
 					// this peptide
 					outPeptides.addLast(new PeptideInfo(sequence.substring(
-							pepStart, i + 1 - pepStart), pepStart));
+							pepStart, i + 1), pepStart));
 				} else if (cleavePos) {
 					outPeptides.addLast(new PeptideInfo(sequence.substring(
-							pepStart, i + 1 - pepStart), pepStart));
+							pepStart, i + 1), pepStart));
 					if (++cleaveSites == 1) {
 						nextPepStart = i + 1;
 					}
 					if (digest == DIGEST.PARTIAL_DIGEST) {
 						for (int j = pepStart; j < nextPepStart; ++j) {
 							outPeptides.addLast(new PeptideInfo(sequence
-									.substring(j, i - j + 1), j));
+									.substring(j, i + 1), j));
 						}
 					}
 					if (cleaveSites > missedCleavages) {
@@ -368,7 +411,7 @@ public class TideIndexApplication extends CruxApplication {
 					if (digest == DIGEST.PARTIAL_DIGEST) {
 						for (int j = pepStart + 1; j < nextPepStart; ++j) {
 							outPeptides.addLast(new PeptideInfo(sequence
-									.substring(j, i - j + 1), j));
+									.substring(j, i + 1), j));
 						}
 					}
 					pepStart = nextPepStart;
@@ -386,19 +429,212 @@ public class TideIndexApplication extends CruxApplication {
 							j));
 				}
 			}
-			
+
+			// Erase peptides that don't meet length requirement
+			for (int i = 0; i < outPeptides.size();) {
+				PeptideInfo pi = outPeptides.get(i);
+
+				if (pi.first.length() < minLength
+						|| pi.first.length() > maxLength) {
+					outPeptides.remove(i);
+				} else {
+					// FIXME 이거 왜 있음?
+					++i;
+				}
+			}
+		} else {
+			// No enzyme
+			// Get all substrings min <= length <= max
+			for (int i = 0; i < sequence.length(); ++i) {
+				for (int j = minLength; (i + j) <= sequence.length()
+						&& j <= maxLength; ++j) {
+					outPeptides.addLast(new PeptideInfo(sequence.substring(i, i
+							+ j), i));
+				}
+			}
 		}
 
 	}
 
-	private void writePeptidesAndAuxLocs(final String sequence,
-			final MASS_TYPE massType) {
-		// TODO 구현해.
+	private void writePeptidesAndAuxLocs(
+			LinkedList<TideIndexPeptide> peptideHeap,
+			Pair2<String, String> peptideAndAuxLocsPbFile,
+			Header.Builder pbHeader) {
+		// Check header
+		if (pbHeader.getSourceCount() != 1) {
+			Carp.carp(Carp.CARP_FATAL,
+					"pbHeader had a number of source other than 1");
+		}
+		System.out.println("size :::: " + peptideHeap.size());
+
+		// TODO 빌더임. 나중에 다시 Set 잊지말것.
+		Header.Source.Builder headerSource = pbHeader.getSourceBuilder(0);
+		if (!headerSource.hasFilename() || headerSource.hasFiletype()) {
+			Carp.carp(Carp.CARP_FATAL, "pbHeader source invalid");
+		}
+
+		String proteinsFile = headerSource.getFilename();
+
+		LinkedList<Protein> proteins = new LinkedList<Protein>();
+		Header proteinsHeader;
+
+		Carp.carp(Carp.CARP_INFO, "Reading proteins");
+
+		boolean succeed = true;
+
+		HeadedRecordReader reader = new HeadedRecordReader(proteinsFile,
+				Header.getDefaultInstance());
+		proteinsHeader = reader.getHeader();
+		System.out.println(proteinsHeader.getFileType().toString());
+
+		while (!reader.done()) {
+			Protein protein = reader.read();
+			proteins.addLast(protein);
+			// System.out.println(protein.getId());
+
+		}
+		if (!reader.ok()) {
+			System.out.println("ahng?");
+			proteins.clear();
+			succeed = false;
+		}
+
+		if (!succeed) {
+			Carp.carp(Carp.CARP_FATAL, "Error reading proteins from %s",
+					proteinsFile);
+		} else if (proteinsHeader.getFileType() != Header.FileType.RAW_PROTEINS) {
+			Carp.carp(Carp.CARP_FATAL, "Proteins file %s had invalid type",
+					proteinsFile);
+		}
+
+		// clean up 생략
+
+		headerSource.setHeader(proteinsHeader);
+
+		if (!pbHeader.hasPeptidesHeader()) {
+			Carp.carp(Carp.CARP_FATAL,
+					"pbHeader doeasn't have peptide heap header");
+		}
+
+		PeptidesHeader.Builder settings = pbHeader.getPeptidesHeaderBuilder(); // builder
+		// 만들었음.
+
+		if ((!settings.hasEnzyme()) || settings.getEnzyme().isEmpty()) {
+			Carp.carp(Carp.CARP_FATAL, "Enzyme setting error");
+		}
+
+		pbHeader.setFileType(Header.FileType.PEPTIDES);
+
+		Header.PeptidesHeader.Builder tempPeptidesHeader = pbHeader
+				.getPeptidesHeaderBuilder();
+		tempPeptidesHeader.setHasPeaks(false);
+		// decoy type 정하는거 일단 보류
+		pbHeader.setPeptidesHeader(tempPeptidesHeader);
+		HeadedRecordWriter peptideWriter = new HeadedRecordWriter(
+				peptideAndAuxLocsPbFile.first, pbHeader.build()); // put header
+																	// in
+																	// outfile
+
+		// Create the auxiliary locations header and writer
+
+		Header.Builder auxLocsHeader = Header.newBuilder();
+		auxLocsHeader.setFileType(Header.FileType.AUX_LOCATIONS);
+		Header.Source.Builder auxLocsSource = auxLocsHeader.addSourceBuilder();
+		// FIXME 여기도 뭔가 이상한데? 왜 peptidePbFile이야?
+		auxLocsSource.setFiletype(peptideAndAuxLocsPbFile.first);
+		auxLocsSource.setHeader(pbHeader.clone());
+		HeadedRecordWriter auxLocWriter = new HeadedRecordWriter(
+				peptideAndAuxLocsPbFile.second, auxLocsHeader.build());
+
+		AuxLocation.Builder pbAuxLoc = AuxLocation.newBuilder();
+		Peptide.Builder pbPeptide = Peptide.newBuilder();
+
+		int auxLocIdx = -1;
+		Carp.carp(Carp.CARP_DEBUG, "%d peptides in heap", peptideHeap.size());
+		int count = 0;
+		Collections.sort(peptideHeap);
+
+		while (!peptideHeap.isEmpty()) {
+			TideIndexPeptide curPeptide = peptideHeap.getLast();
+			peptideHeap.removeLast();
+			// For duplicate peptides we only record the location
+			while ((!peptideHeap.isEmpty())
+					&& (peptideHeap.getLast().isEqual(curPeptide))) {
+				Location.Builder location = pbAuxLoc.addLocationBuilder();
+				location.setProteinId(peptideHeap.getLast().getProteinId());
+				location.setPos(peptideHeap.getLast().getProteinPos());
+				peptideHeap.removeLast();
+			}
+			getPbPeptide(count, curPeptide, pbPeptide);
+
+			// Not all peptides have aux locations associated with them. Check
+			// to see if GetGroup added any locations to aux_location. If yes,
+			// only then assign the corresponding array index to the peptide and
+			// write it out.
+			if (pbAuxLoc.getLocationCount() > 0) {
+
+				pbPeptide.setAuxLocationsIndex(++auxLocIdx);
+				auxLocWriter.write(pbAuxLoc.build());
+				pbAuxLoc.clear();
+			}
+			peptideWriter.write(pbPeptide.build());
+
+			if (++count % 100000 == 0) {
+				Carp.carp(Carp.CARP_INFO, "Wrote %d peptides, %d  auxlocs",
+						count, auxLocIdx);
+			}
+		}
+		peptideWriter.finish();
+		auxLocWriter.finish();
+
+	}
+
+	boolean readRecordsToLinkedList(LinkedList<Protein> vec,
+			final String fileName, Header.Builder header) {
+		HeadedRecordReader reader = new HeadedRecordReader(fileName,
+				header.build());
+		while (!reader.done()) {
+			Protein.Builder proteinBuilder = Protein.newBuilder();
+			Protein protein = proteinBuilder.build();
+			reader.read();
+			vec.addLast(protein);
+		}
+		if (!reader.ok()) {
+			return false;
+		}
+		return true;
 	}
 
 	private double calcPepMassTide(final String sequence, MASS_TYPE massType) {
-		// TODO 구현해.
-		return 0;
+
+		int mass = 0;
+		int aaMass = 0;
+
+		if (massType == MASS_TYPE.AVERAGE) {
+			mass = MassConstants.FIXP_AVG_H2O;
+			for (int i = 0; i < sequence.length(); ++i) {
+				aaMass = MassConstants.FIXP_AVG_TABLE[sequence.charAt(i)];
+				if (aaMass == 0) {
+					return -1;
+				}
+				mass += aaMass;
+			}
+
+		} else if (massType == MASS_TYPE.MONO) {
+			mass = MassConstants.FIXP_MONO_H2O;
+			for (int i = 0; i < sequence.length(); ++i) {
+				aaMass = MassConstants.FIXP_MONO_TABLE[sequence.charAt(i)];
+				if (aaMass == 0) {
+					return -1;
+				}
+				mass += aaMass;
+			}
+
+		} else {
+			Carp.carp(Carp.CARP_FATAL, "Invalid mass type");
+		}
+
+		return MassConstants.toDouble(mass);
 	}
 
 	private void getPbProtein(final int id, final String name,
@@ -410,13 +646,25 @@ public class TideIndexApplication extends CruxApplication {
 	}
 
 	private void getPbPeptide(final int id, final TideIndexPeptide peptide,
-			Peptide outPbPeptide) {
-		// TODO 구현해.
+			Peptide.Builder outPbPeptide) {
+		outPbPeptide.clear();
+		outPbPeptide.setId(id);
+		outPbPeptide.setMass(peptide.getMass());
+		outPbPeptide.setLength(peptide.getLength());
+		Location.Builder firstLocation = outPbPeptide.getFirstLocationBuilder();
+		firstLocation.setProteinId(peptide.getProteinId());
+		firstLocation.setPos(peptide.getProteinPos());
+
+		outPbPeptide.setIsDecoy(peptide.isDecoy());
+
 	}
 
 	private void addAuxLoc(final int proteinId, final int proteinPos,
-			AuxLocation outAuxLoc) {
-
+			AuxLocation.Builder outAuxLoc) {
+		Location.Builder location = outAuxLoc.addLocationBuilder();
+		location.setProteinId(proteinId);
+		location.setPos(proteinPos);
+		outAuxLoc.addLocation(location);
 	}
 
 	@Override
@@ -451,11 +699,25 @@ public class TideIndexApplication extends CruxApplication {
 		// Get Options
 
 		double minMass = Flags.getDoubleParameter("min-mass");
+		if (minMass == 0) {
+			minMass = 200;
+		}
 		double maxMass = Flags.getDoubleParameter("max-mass");
+		if (maxMass == 0) {
+			maxMass = 7200;
+		}
 		int minLength = Flags.getIntParameter("min-length");
+		if (minLength == 0) {
+			minLength = 6;
+		}
 		int maxLength = Flags.getIntParameter("max-length");
+		if (maxLength == 0) {
+			maxLength = 50;
+		}
 		boolean monoisotopicPrecursor = Flags
 				.getBooleanParameter("monoisotopic-precursor");
+		monoisotopicPrecursor = true;
+
 		Flags.MaxMods = Flags.getIntParameter("max-mods");
 		MASS_TYPE mass_type = (monoisotopicPrecursor) ? MASS_TYPE.MONO
 				: MASS_TYPE.AVERAGE;
@@ -590,7 +852,86 @@ public class TideIndexApplication extends CruxApplication {
 				outProteins, proteinPbHeader, peptideHeap, proteinSequences,
 				null);
 
-		// Set up peptides header.
+		Header.Builder headerWithMods = Header.newBuilder();
+
+		// Set up peptides header
+		Header.PeptidesHeader.Builder pepHeader = Header.PeptidesHeader
+				.newBuilder();
+		pepHeader.clear();
+		pepHeader.setMinMass(minMass);
+		pepHeader.setMaxMass(maxMass);
+		pepHeader.setMinLength(minLength);
+		pepHeader.setMaxLength(maxLength);
+		pepHeader.setMonoisotopicPrecursor(monoisotopicPrecursor);
+		pepHeader.setEnzyme(enzyme.toString());
+
+		// FIXME 이부분 모호함.
+		if (enzyme.toString() != "none") {
+			pepHeader.setFullDigestion(digestion == DIGEST.FULL_DIGEST);
+			pepHeader.setMaxMissedCleavages(missedCleavages);
+		}
+
+		// FIXME 맞는지 확신은 없음.
+		pepHeader.setMods(varModTable.parsedModTable());
+
+		headerWithMods.setPeptidesHeader(pepHeader);
+
+		headerWithMods.setFileType(Header.FileType.PEPTIDES);
+		headerWithMods.setCommandLine(cmdLine);
+
+		Header.Source.Builder source = headerWithMods.addSourceBuilder();
+		source.setHeader(headerWithMods.build());
+		source.setFilename(AbsPath.absPath(outProteins));
+		// headerWithMods = headerWithMods.addSource(source.build());
+
+		Header.Builder headerNoMods = headerWithMods.clone();
+		PeptidesHeader.Builder delPeptideHeader = PeptidesHeader
+				.newBuilder(headerNoMods.getPeptidesHeader());
+		ModTable.Builder del = ModTable.newBuilder(delPeptideHeader.getMods());
+		del.clearVariableMod();
+		del.clearUniqueDeltas();
+
+		delPeptideHeader.setMods(del);
+		headerNoMods.setPeptidesHeader(delPeptideHeader);
+
+		boolean needMods = varModTable.uniqueDeltaSize() > 0;
+
+		String basicPeptides = (needMods) ? modlessPeptides : peaklessPeptides;
+		Carp.carp(Carp.CARP_DEBUG, "basicPeptides=%s", basicPeptides);
+		writePeptidesAndAuxLocs(peptideHeap, Pair2.of(basicPeptides, outAux),
+				headerNoMods);
+
+		LinkedList<Protein> proteins = new LinkedList<Protein>();
+
+		boolean succeed = true;
+
+		HeadedRecordReader reader = new HeadedRecordReader(outProteins,
+				Header.getDefaultInstance());
+
+		while (!reader.done()) {
+			Protein protein = reader.read();
+			proteins.addLast(protein);
+
+		}
+		if (!reader.ok()) {
+			proteins.clear();
+			succeed = false;
+		}
+		if (!succeed) {
+			Carp.carp(Carp.CARP_FATAL, "Error reading proteins file");
+		}
+
+		if (needMods) {
+			Carp.carp(Carp.CARP_INFO, "Computing modified peptides");
+			HeadedRecordReader ㄲreader = new HeadedRecordReader(
+					modlessPeptides, null);
+
+		}
+
+		// TODO out target list 구현 266~375 line.
+		addTheoriticalPeaks(proteins, peaklessPeptides, outPeptides);
+
+		Carp.carp(Carp.CARP_INFO, "Precomputing theoretical spectra...");
 
 		Carp.carp(Carp.CARP_DEBUG, "디버그 종료.");
 
@@ -621,8 +962,88 @@ public class TideIndexApplication extends CruxApplication {
 
 	@Override
 	public boolean hidden() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
+	void addTheoriticalPeaks(LinkedList<Protein> proteins,
+			String inputFileName, String outputFileName) {
+		Header origHeader = null;
+		HeadedRecordReader reader = new HeadedRecordReader(inputFileName,
+				Header.getDefaultInstance());
+		origHeader = reader.getHeader();
+
+		MassConstants.init(origHeader.getPeptidesHeader().getMods());
+
+		Header.Builder newHeader = Header.newBuilder();
+		newHeader.setFileType(Header.FileType.PEPTIDES);
+
+		Header.PeptidesHeader.Builder subHeader = Header.PeptidesHeader
+				.newBuilder(origHeader.getPeptidesHeader());
+		subHeader.setHasPeaks(true);
+		Header.Source.Builder source = newHeader.addSourceBuilder();
+		source.setHeader(origHeader);
+		source.setFilename(AbsPath.absPath(inputFileName));
+
+		HeadedRecordWriter writer = new HeadedRecordWriter(outputFileName,
+				newHeader.build());
+
+		final int workspaceSize = 2000;
+
+		TheoreticalPeakSetDiff workspace = new TheoreticalPeakSetDiff(
+				workspaceSize);
+
+		int count = 0;
+		while (!reader.done()) {
+			if((count++ % 100000) == 0){
+				System.out.println("readcount : " + count);
+			}
+			
+			Peptide.Builder pbPeptide = Peptide
+					.newBuilder(reader.readPeptide());
+			edu.hyu.cs.jcrux.tide.Peptide peptide = new edu.hyu.cs.jcrux.tide.Peptide(
+					pbPeptide.build(), proteins);
+			workspace.clear();
+			peptide.computeTheoreticalPeaks(workspace);
+			TheoreticalPeakArr peaksCharge1 = new TheoreticalPeakArr(2000);
+			TheoreticalPeakArr peaksCharge2 = new TheoreticalPeakArr(2000);
+			TheoreticalPeakArr negsCharge1 = new TheoreticalPeakArr(2000);
+			TheoreticalPeakArr negsCharge2 = new TheoreticalPeakArr(2000);
+
+			workspace.getPeaks(peaksCharge1, negsCharge1, peaksCharge2,
+					negsCharge2);
+
+			addPeaksToPB(pbPeptide, peaksCharge1, 1, false);
+			addPeaksToPB(pbPeptide, peaksCharge2, 2, false);
+			addPeaksToPB(pbPeptide, negsCharge1, 1, true);
+			addPeaksToPB(pbPeptide, negsCharge2, 2, true);
+			
+			writer.write(pbPeptide.build());
+			
+		}
+		
+		writer.finish();
+	}
+
+	void addPeaksToPB(Peptide.Builder peptide, TheoreticalPeakArr peaks,
+			int charge, boolean neg) {
+		int lastCode = 0;
+		
+		for(int i = 0 ; i < peaks.size(); i ++){
+			int delta = peaks.get(i).getCode() - lastCode;
+			lastCode = peaks.get(i).getCode();
+			if (neg) {
+				if (charge == 1) {
+					peptide.addNegPeak1(delta);
+				} else {
+					peptide.addNegPeak2(delta);
+				}
+			} else {
+				if (charge == 1) {
+					peptide.addPeak1(delta);
+				} else {
+					peptide.addPeak2(delta);
+				}
+			}
+		}
+	}
 }

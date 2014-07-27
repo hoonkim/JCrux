@@ -1,8 +1,8 @@
 package edu.hyu.cs.jcrux.tide.records;
 
-import com.google.protobuf.Message;
-
 import edu.hyu.cs.pb.HeaderPB.Header;
+import edu.hyu.cs.pb.PeptidesPB.Peptide;
+import edu.hyu.cs.pb.RawProteinsPB.Protein;
 
 public class HeadedRecordReader {
 	private RecordReader mReader;
@@ -12,13 +12,22 @@ public class HeadedRecordReader {
 	public HeadedRecordReader(final String fileName, final Header header,
 			final int bufSize) {
 		mReader = new RecordReader(fileName, bufSize);
+		mHeader = null;
+
+		mDelHeader = (header == null);
+
+		if (!done()) {
+			mHeader = read(mHeader);
+		}
+	}
+
+	public HeadedRecordReader(final String fileName, final Header header) {
+		mReader = new RecordReader(fileName);
 		mHeader = header;
 		mDelHeader = (header == null);
-		if (header == null) {
-			mHeader = Header.getDefaultInstance();
-		}
 		if (!done()) {
-			read(mHeader);
+			mHeader = read(mHeader);
+			// System.out.println(mHeader.getFileType());
 		}
 	}
 
@@ -34,11 +43,20 @@ public class HeadedRecordReader {
 		return mReader.done();
 	}
 
-	public boolean read(final Message message) {
+	public Header read(Header message) {
+		System.out.print("Headed ");
 		return mReader.read(message);
+	}
+
+	public Protein read() {
+		return mReader.read();
 	}
 
 	public Header getHeader() {
 		return mHeader;
+	}
+	
+	public Peptide readPeptide(){
+		return mReader.readPeptide();
 	}
 }

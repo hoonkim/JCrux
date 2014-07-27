@@ -1,14 +1,16 @@
 package edu.hyu.cs.types;
 
-import java.util.Comparator;
 
 public class Pair<A extends Comparable<? super A>, B extends Comparable<? super B>>
 		implements Comparable<Pair<A, B>> {
 
+	
+	
+	
 	public final A first;
 	public final B second;
 
-	private Pair(A first, B second) {
+	protected Pair(A first, B second) {
 		this.first = first;
 		this.second = second;
 	}

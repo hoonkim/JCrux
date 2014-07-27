@@ -20,6 +20,7 @@ public class RecordWriter {
 	public RecordWriter(final String fileName, int bufSize)
 			throws FileNotFoundException {
 		File file = new File(fileName);
+		System.out.println(fileName);
 
 		mRawOutput = new FileOutputStream(file, false);
 		mBufferSize = bufSize;
@@ -47,6 +48,7 @@ public class RecordWriter {
 		try {
 			/* WriteVarint32(message->ByteSize())를 대신하였음 */
 			mCodedOutput.writeRawVarint32(message.getSerializedSize());
+
 		} catch (IOException e) {
 			mCodedOutput = null;
 			Carp.carp(Carp.CARP_DEBUG, "mCodedOutput error");
@@ -56,8 +58,26 @@ public class RecordWriter {
 		try {
 			/* SerializeWithCachedSizes를 writeTo로 대신하였는데 맞는지 모르겠음. */
 			message.writeTo(mCodedOutput);
+			mCodedOutput.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
+		}
+
+		return true;
+	}
+
+	public boolean finish() {
+
+		System.out.println("Finish!!");
+		try {
+			/* WriteVarint32(message->ByteSize())를 대신하였음 */
+			mCodedOutput.writeRawVarint32(0);
+			mCodedOutput.flush();
+
+		} catch (IOException e) {
+			mCodedOutput = null;
+			Carp.carp(Carp.CARP_DEBUG, "mCodedOutput error");
+			return false;
 		}
 
 		return true;
@@ -66,7 +86,7 @@ public class RecordWriter {
 	private void init() {
 		mCodedOutput = CodedOutputStream.newInstance(mRawOutput);
 		try {
-			mCodedOutput.writeInt32NoTag(MAGIC_NUMBER);
+			mCodedOutput.writeRawLittleEndian32(MAGIC_NUMBER);
 		} catch (IOException e) {
 			mCodedOutput = null;
 			Carp.carp(Carp.CARP_DEBUG, "mCodedOutput error");

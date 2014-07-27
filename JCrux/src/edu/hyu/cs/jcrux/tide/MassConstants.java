@@ -6,7 +6,7 @@ import edu.hyu.cs.pb.HeaderPB.Modification;
 
 public class MassConstants {
 	public static final double PROTON = 1.00727646688;
-	public static final double BIN_WDITH = 1.0005079;
+	public static final double BIN_WIDTH = 1.0005079;
 
 	public static double MONO_TABLE[] = new double[256];
 	public static double AVG_TABLE[] = new double[256];
@@ -39,12 +39,12 @@ public class MassConstants {
 	static public int FIXP_MONO_TABLE[] = new int[256];
 	static public int FIXP_AVG_TABLE[] = new int[256];
 
-	static public int FIXP_MONO_H2O;
-	static public int FIXP_AVG_H2O;
+	static public int FIXP_MONO_H2O = toFixPt(MONO_H2O);
+	static public int FIXP_AVG_H2O = toFixPt(AVG_H2O);
 
-	static public int FIXP_MONO_NH3;
-	static public int FIXP_MONO_CO;
-	static public int FIXP_PROTON;
+	static public int FIXP_MONO_NH3 = toFixPt(MONO_NH3);
+	static public int FIXP_MONO_CO = toFixPt(MONO_CO);
+	static public int FIXP_PROTON = toFixPt(PROTON);
 
 	private static ModCoder modCoder;
 
@@ -52,6 +52,7 @@ public class MassConstants {
 	private static double[] uniqueDeltasBin;
 
 	public static boolean init(final ModTable modTable) {
+		
 		if (modTable != null && checkModTable(modTable)) {
 			return false;
 		}
@@ -65,6 +66,7 @@ public class MassConstants {
 		fillMassTable(ELTS_AVG, AVG_TABLE);
 
 		if (modTable != null) {
+			
 			for (int i = 0; i < modTable.getStaticModCount(); ++i) {
 				char aa = modTable.getStaticMod(i).getAminoAcids().charAt(0);
 				double delta = modTable.getStaticMod(i).getDelta();
@@ -90,8 +92,15 @@ public class MassConstants {
 			for (int i = 0; i < 256; ++i) {
 				if (MONO_TABLE[i] == 0) {
 					MONO_TABLE[i] = AVG_TABLE[i] = AA_BIN1[i] = AA_BIN2[i] = Double.NaN;
+					FIXP_MONO_TABLE[i] = FIXP_AVG_TABLE[i] = 0;
+					
+				} else {
+					double bin = MONO_TABLE[i]/BIN_WIDTH;
+					AA_BIN1[i] = bin;
+					AA_BIN2[i] = bin/2;
 					FIXP_MONO_TABLE[i] = toFixPt(MONO_TABLE[i]);
 					FIXP_AVG_TABLE[i] = toFixPt(AVG_TABLE[i]);
+					
 				}
 			}
 		}
