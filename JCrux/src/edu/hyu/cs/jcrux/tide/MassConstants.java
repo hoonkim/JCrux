@@ -13,7 +13,8 @@ public class MassConstants {
 	public static double AA_BIN1[] = new double[256];
 	public static double AA_BIN2[] = new double[256];
 
-	public static double ELTS_MONO[] = { 1.007825035, // H
+	public static double ELTS_MONO[] = { 
+			1.007825035, // H
 			12.0, // C
 			14.003074, // N
 			15.99491463, // O
@@ -21,7 +22,8 @@ public class MassConstants {
 			31.9720707 // S
 	};
 
-	public static double ELTS_AVG[] = { 1.00794, // H
+	public static double ELTS_AVG[] = {
+			1.00794, // H
 			12.0107, // C
 			14.0067, // N
 			15.9994, // O

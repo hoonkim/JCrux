@@ -8,6 +8,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
 import edu.hyu.cs.jcrux.Objects.ENZYME;
@@ -21,6 +22,8 @@ public class Flags {
 	public static double MaxMz;
 	
 	public static String tmpFilePrefix;
+	
+	private static long time;
 
 	public static void intializeParameters(final String optionList[],
 			String argv[]) {
@@ -59,6 +62,14 @@ public class Flags {
 		} else {
 			return 0;
 		}
+	}
+	
+	public static void start(){
+		time = System.currentTimeMillis();
+	}
+	
+	public static void check(){
+		Carp.carp(Carp.CARP_INFO, "Total Time %d", System.currentTimeMillis() - time);
 	}
 
 	public static DIGEST getDigestParameter(final String option) {

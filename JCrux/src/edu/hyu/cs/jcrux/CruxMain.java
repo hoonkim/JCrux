@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux;
 
+import edu.hyu.cs.flags.Flags;
 import edu.hyu.cs.jcrux.tide.TideIndexApplication;
 import edu.hyu.cs.jcrux.tide.TideSearchApplication;
 
@@ -29,8 +30,9 @@ public class CruxMain {
 		applications.add(new TideSearchApplication());
 		
 		
-
+		Flags.start();
 		applications.main(args);
+		Flags.check();
 
 	}
 }

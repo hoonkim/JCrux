@@ -169,6 +169,7 @@ public class Carp {
 
 		if (verbosity <= mVerbosity) {
 			String formattedString = String.format(str, format);
+			formattedString+= '\n';
 
 			System.err.println(formattedString);
 			if (logFile != null) {
