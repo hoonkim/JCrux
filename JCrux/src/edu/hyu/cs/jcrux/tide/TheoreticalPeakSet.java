@@ -1,11 +1,6 @@
 package edu.hyu.cs.jcrux.tide;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-
-import com.google.protobuf.RepeatedFieldBuilder;
-
-import edu.hyu.cs.pb.PeptidesPB.Peptide;
+import edu.hyu.cs.jcrux.Carp;
 
 public abstract class TheoreticalPeakSet {
 
@@ -33,7 +28,7 @@ public abstract class TheoreticalPeakSet {
 	public static void addPeak(TheoreticalPeakArr dest, int index,
 		TheoreticalPeakPair.TheoreticalPeakType intensity) {
 		TheoreticalPeakPair peak = new TheoreticalPeakPair(index, intensity);
-
+		
 		dest.addLast(peak);
 	}
 
@@ -68,15 +63,16 @@ public abstract class TheoreticalPeakSet {
 
 	protected static void removeDups(TheoreticalPeakArr src,
 			TheoreticalPeakArr dest) {
-		for (int i = 0; i < src.size(); i++) {
+		for (int i = 0; i != src.size(); i++) {
 			int index = src.get(i).getBin();
 			if (MaxMZ.global().getMaxBin() > 0
 					&& index >= MaxMZ.global().getCacheBinEnd()) {
 				break;
 			}
-			for (++i; (i != src.size()) && (src.get(i).getBin() == index); ++i) {
-				dest.addLast(src.get(i));
-			}
+			for (++i; (i != src.size()) && (src.get(i).getBin() == index); ++i);
+			--i;
+			dest.addLast(src.get(i));
+			
 		}
 	}
 
@@ -84,8 +80,7 @@ public abstract class TheoreticalPeakSet {
 			TheoreticalPeakArr pos, TheoreticalPeakArr neg) {
 		int xc = 0;
 		int yc = 0;
-		while ((xc < x.size()) && (yc < y.size())) {
-			System.out.println("xc :" + xc + ", yc: " + yc);
+		while ((xc < x.size()) && (yc < y.size())) {		
 
 			if (x.get(xc).isSmaller(y.get(yc))) {
 				pos.addLast(x.get(xc++));

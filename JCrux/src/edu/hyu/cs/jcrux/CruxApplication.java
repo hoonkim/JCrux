@@ -70,6 +70,8 @@ public abstract class CruxApplication {
 		Carp.setVerbosityLevel(Carp.CARP_DEBUG);
 
 		Flags.intializeParameters(optionList, argv);
+		Flags.start();
+		
 
 		Carp.carp(Carp.CARP_INFO, "Beginning %s", getName());
 

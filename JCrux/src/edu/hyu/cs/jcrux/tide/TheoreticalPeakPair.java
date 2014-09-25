@@ -53,6 +53,6 @@ public class TheoreticalPeakPair {
 	}
 	
 	boolean isSmaller(TheoreticalPeakPair other){
-		return mCode > other.getCode();
+		return mCode < other.getCode();
 	}
 }

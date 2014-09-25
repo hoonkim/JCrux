@@ -195,9 +195,11 @@ public class VariableModTable {
 				}
 
 				aa = str.substring(matcher2.start(), matcher2.end());
-
-				delta = Double.parseDouble(str.substring(matcher2.end() + 2,
+						
+				delta = Double.parseDouble(str.substring(matcher2.end() + 1,
 						str.length()));
+				
+				Carp.carp(Carp.CARP_INFO, "Delta %f", delta);
 
 				plus = str.charAt(matcher2.end());
 

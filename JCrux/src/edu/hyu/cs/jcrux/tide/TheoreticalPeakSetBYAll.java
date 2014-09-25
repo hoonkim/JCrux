@@ -1,10 +1,11 @@
 package edu.hyu.cs.jcrux.tide;
 
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.tide.TheoreticalPeakPair.TheoreticalPeakType;
 
 public class TheoreticalPeakSetBYAll extends TheoreticalPeakSet {
 
-	private OrderedPeakSets orderedPeakSets;
+	OrderedPeakSets orderedPeakSets;
 
 	public TheoreticalPeakSetBYAll(int capacity) {
 		orderedPeakSets = new OrderedPeakSets(capacity);
@@ -17,7 +18,7 @@ public class TheoreticalPeakSetBYAll extends TheoreticalPeakSet {
 
 	@Override
 	public void addYIon(double mass, int charge) {
-		addYIon(mass, charge, orderedPeakSets.mYSeries[charge - 1]);
+		addYIon(mass, charge, orderedPeakSets.mYSeries[charge - 1]); 
 	}
 
 	@Override
@@ -29,6 +30,7 @@ public class TheoreticalPeakSetBYAll extends TheoreticalPeakSet {
 	public void getPeaks(TheoreticalPeakArr peaksCharge1,
 			TheoreticalPeakArr negsCharge1, TheoreticalPeakArr peaksCharge2,
 			TheoreticalPeakArr negsCharge2) {
+		orderedPeakSets.merge(null);
 		copy(orderedPeakSets.mTemp1, peaksCharge1);
 		copy(orderedPeakSets.mTemp3, peaksCharge2);
 	}

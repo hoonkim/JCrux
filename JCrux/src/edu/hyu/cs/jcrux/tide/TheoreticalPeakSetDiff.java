@@ -1,5 +1,7 @@
 package edu.hyu.cs.jcrux.tide;
 
+import edu.hyu.cs.jcrux.Carp;
+
 public class TheoreticalPeakSetDiff extends TheoreticalPeakSet {
 
 	private TheoreticalPeakSetBYAll byAll;
@@ -45,7 +47,7 @@ public class TheoreticalPeakSetDiff extends TheoreticalPeakSet {
 	public void getPeaks(TheoreticalPeakArr peaksCharge1,
 			TheoreticalPeakArr negsCharge1, TheoreticalPeakArr peaksCharge2,
 			TheoreticalPeakArr negsCharge2) {
-
+		
 		makeAll.getPeaks(makeAll1, null, makeAll2, null);
 		byAll.getPeaks(byAll1, null, byAll2, null);
 

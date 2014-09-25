@@ -60,8 +60,7 @@ public class MassConstants {
 		}
 
 		for (int i = 0; i < 256; ++i) {
-			MONO_TABLE[i] = 0;
-			AVG_TABLE[i] = 0;
+			MONO_TABLE[i] = AVG_TABLE[i] = 0;
 		}
 
 		fillMassTable(ELTS_MONO, MONO_TABLE);
@@ -88,7 +87,7 @@ public class MassConstants {
 
 			for (int i = 0; i < modTable.getUniqueDeltasCount(); ++i) {
 				uniqueDeltas[i] = modTable.getUniqueDeltas(i);
-				uniqueDeltasBin[i] = modTable.getUniqueDeltas(i);
+				uniqueDeltasBin[i] = uniqueDeltasBin[i]/BIN_WIDTH;
 			}
 
 			for (int i = 0; i < 256; ++i) {
@@ -195,7 +194,7 @@ public class MassConstants {
 	}
 
 	public static int toFixPt(double x) {
-		return (int) Math.round(x * K_FIXED_POINT_SCALAR);
+		return (int) (x * K_FIXED_POINT_SCALAR + 0.5);
 	}
 
 	public static double toDouble(int x) {

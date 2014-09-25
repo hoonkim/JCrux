@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux.tide;
 
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.tide.TheoreticalPeakPair.TheoreticalPeakType;
 
 public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
@@ -36,6 +37,9 @@ public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
 		// } else {
 		removeDups(orderedPeakSets.mTemp1, peaksCharge1);
 		removeDups(orderedPeakSets.mTemp3, peaksCharge2);
+//		Carp.carp(Carp.CARP_INFO, "%d %d %d %d", orderedPeakSets.mTemp1.size(),
+//				peaksCharge1.size(), orderedPeakSets.mTemp3.size(),
+//				peaksCharge2.size());
 		// }
 
 	}
@@ -44,6 +48,7 @@ public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
 		// H2O
 		int index = (int) (mass + IonOffsets.Y_H2O[charge]);
 		addPeak(dest, index, TheoreticalPeakType.LOSS_PEAK);
+
 		// NH3
 		index = (int) (mass + IonOffsets.Y_NH3[charge]);
 		addPeak(dest, index, TheoreticalPeakType.LOSS_PEAK);
@@ -51,6 +56,7 @@ public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
 		if (true /* FLAGS_flanks */) {
 			addPeak(dest, index - 1, TheoreticalPeakType.FLANKING_PEAK);
 		}
+		addPeak(dest, index, TheoreticalPeakType.PRIMARY_PEAK);
 		if (true /* FLAGS_flanks */) {
 			addPeak(dest, index + 1, TheoreticalPeakType.FLANKING_PEAK);
 		}
@@ -60,6 +66,7 @@ public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
 		// A-Ion
 		int index = (int) (mass + IonOffsets.A[charge]);
 		addPeak(dest, index, TheoreticalPeakType.LOSS_PEAK);
+
 		// H2O
 		index = (int) (mass + IonOffsets.B_H2O[charge]);
 		addPeak(dest, index, TheoreticalPeakType.LOSS_PEAK);
@@ -71,6 +78,7 @@ public class TheoreticalPeakSetMakeAll extends TheoreticalPeakSet {
 		if (true /* FLAGS_flanks */) {
 			addPeak(dest, index - 1, TheoreticalPeakType.FLANKING_PEAK);
 		}
+		addPeak(dest, index, TheoreticalPeakType.PRIMARY_PEAK);
 		if (true /* FLAGS_flanks */) {
 			addPeak(dest, index + 1, TheoreticalPeakType.FLANKING_PEAK);
 		}

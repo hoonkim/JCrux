@@ -2,6 +2,7 @@ package edu.hyu.cs.jcrux.tide;
 
 import java.util.LinkedList;
 
+import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.pb.PeptidesPB;
 import edu.hyu.cs.pb.RawProteinsPB.Protein;
 
@@ -37,6 +38,7 @@ public class Peptide {
 		// mProg2 = null;
 
 		// 포인터로 되있는 부분을 subString으로 대체함. 문제가 될 수 있음 나중에 체크.
+		
 		mResidues = proteins.get(mFirstLocProteinId).getResidues()
 				.substring(mFirstLocPos);
 
@@ -116,6 +118,7 @@ public class Peptide {
 			massesCharge1.add(MassConstants.AA_BIN1[mResidues.charAt(i)]);
 			massesCharge2.add(MassConstants.AA_BIN2[mResidues.charAt(i)]);
 		}
+		
 
 		for (int i = 0; i < mNumMods; ++i) {
 			int index = 0;
@@ -125,6 +128,7 @@ public class Peptide {
 			massesCharge1.set(index, massesCharge1.get(index) + delta);
 			massesCharge2.set(index, massesCharge2.get(index) + delta / 2);
 		}
+		
 
 		// Add all charge 1 B ions.
 		double total = massesCharge1.get(0);
@@ -135,6 +139,9 @@ public class Peptide {
 
 			total += massesCharge1.get(i);
 		}
+		
+
+		// System.out.println(total);
 
 		// Add all charge 2 B ions.
 		total = massesCharge2.get(0);
@@ -143,24 +150,29 @@ public class Peptide {
 			workSpace.addBIon(total, 2);
 
 			total += massesCharge2.get(i);
+
 		}
 
 		// Add all charge 1 Y ions.
-		total = massesCharge2.get(mLen - 1);
+		total = massesCharge1.get(mLen - 1);
+
 		for (int i = mLen - 2; (i >= 0) && (total <= maxPossiblePeak); --i) {
 
 			workSpace.addYIon(total, 1);
 
 			total += massesCharge1.get(i);
+
 		}
 
 		// Add all charge 2 Y ions.
 		total = massesCharge2.get(mLen - 1);
+
 		for (int i = mLen - 2; (i >= 0) && total <= maxPossiblePeak; --i) {
 
 			workSpace.addYIon(total, 2);
 
 			total += massesCharge2.get(i);
+
 		}
 
 	}

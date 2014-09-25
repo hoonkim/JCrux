@@ -68,6 +68,10 @@ public class Flags {
 		time = System.currentTimeMillis();
 	}
 	
+	public static long getTime() {
+		return System.currentTimeMillis()-time;
+	}
+	
 	public static void check(){
 		Carp.carp(Carp.CARP_INFO, "Total Time %d", System.currentTimeMillis() - time);
 	}

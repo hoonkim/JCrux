@@ -467,7 +467,6 @@ public class TideIndexApplication extends CruxApplication {
 		}
 		System.out.println("size :::: " + peptideHeap.size());
 
-		// TODO 빌더임. 나중에 다시 Set 잊지말것.
 		Header.Source.Builder headerSource = pbHeader.getSourceBuilder(0);
 		if (!headerSource.hasFilename() || headerSource.hasFiletype()) {
 			Carp.carp(Carp.CARP_FATAL, "pbHeader source invalid");
@@ -824,11 +823,11 @@ public class TideIndexApplication extends CruxApplication {
 				|| CruxUtils.fileExists(outAux)) {
 			if (overwrite) {
 				Carp.carp(Carp.CARP_DEBUG, "Cleaning old index files(s)");
-				CruxUtils.fileDelete(outProteins);
+				//CruxUtils.fileDelete(outProteins);
 				CruxUtils.fileDelete(outPeptides);
-				CruxUtils.fileDelete(outAux);
-				CruxUtils.fileDelete(modlessPeptides);
-				CruxUtils.fileDelete(peaklessPeptides);
+				//CruxUtils.fileDelete(outAux);
+				//CruxUtils.fileDelete(modlessPeptides);
+				//CruxUtils.fileDelete(peaklessPeptides);
 			} else {
 				Carp.carp(Carp.CARP_FATAL, "Index file(s) alreaday exists ,"
 						+ "use --overwrite T or a different index name");
@@ -847,10 +846,15 @@ public class TideIndexApplication extends CruxApplication {
 		LinkedList<TideIndexPeptide> peptideHeap = new LinkedList<TideIndexPeptide>();
 		// TODO TideIndexPeptide 구현.
 		LinkedList<String> proteinSequences = new LinkedList<String>();
-		fastaToPb(cmdLine, enzyme, digestion, missedCleavages, minMass,
-				maxMass, minLength, maxLength, mass_type, decoyType, fasta,
-				outProteins, proteinPbHeader, peptideHeap, proteinSequences,
-				null);
+
+		System.out.println("fastatopb start : " + Flags.getTime());
+
+//		fastaToPb(cmdLine, enzyme, digestion, missedCleavages, minMass,
+//				maxMass, minLength, maxLength, mass_type, decoyType, fasta,
+//				outProteins, proteinPbHeader, peptideHeap, proteinSequences,
+//				null);
+
+		System.out.println("fastatopb end : " + Flags.getTime());
 
 		Header.Builder headerWithMods = Header.newBuilder();
 
@@ -898,8 +902,11 @@ public class TideIndexApplication extends CruxApplication {
 
 		String basicPeptides = (needMods) ? modlessPeptides : peaklessPeptides;
 		Carp.carp(Carp.CARP_DEBUG, "basicPeptides=%s", basicPeptides);
-		writePeptidesAndAuxLocs(peptideHeap, Pair2.of(basicPeptides, outAux),
-				headerNoMods);
+		System.out
+				.println("writePeptidesAndAuxLocs start : " + Flags.getTime());
+//		writePeptidesAndAuxLocs(peptideHeap, Pair2.of(basicPeptides, outAux),
+//				headerNoMods);
+		System.out.println("writePeptidesAndAuxLocs end : " + Flags.getTime());
 
 		LinkedList<Protein> proteins = new LinkedList<Protein>();
 
@@ -929,9 +936,13 @@ public class TideIndexApplication extends CruxApplication {
 		}
 
 		// TODO out target list 구현 266~375 line.
-		addTheoriticalPeaks(proteins, peaklessPeptides, outPeptides);
 
 		Carp.carp(Carp.CARP_INFO, "Precomputing theoretical spectra...");
+		
+		System.out.println("addTheoriticalPeaks start : " + Flags.getTime());
+		addTheoriticalPeaks(proteins, peaklessPeptides, outPeptides);
+		System.out.println("addTheoriticalPeaks end : " + 14246);
+		
 
 		Carp.carp(Carp.CARP_DEBUG, "디버그 종료.");
 
@@ -976,9 +987,9 @@ public class TideIndexApplication extends CruxApplication {
 
 		Header.Builder newHeader = Header.newBuilder();
 		newHeader.setFileType(Header.FileType.PEPTIDES);
+		
 
-		Header.PeptidesHeader.Builder subHeader = Header.PeptidesHeader
-				.newBuilder(origHeader.getPeptidesHeader());
+		Header.PeptidesHeader.Builder subHeader = newHeader.getPeptidesHeaderBuilder();
 		subHeader.setHasPeaks(true);
 		Header.Source.Builder source = newHeader.addSourceBuilder();
 		source.setHeader(origHeader);
@@ -993,11 +1004,12 @@ public class TideIndexApplication extends CruxApplication {
 				workspaceSize);
 
 		int count = 0;
+
 		while (!reader.done()) {
-			if((count++ % 100000) == 0){
+			if ((count++ % 100000) == 0) {
 				System.out.println("readcount : " + count);
 			}
-			
+
 			Peptide.Builder pbPeptide = Peptide
 					.newBuilder(reader.readPeptide());
 			edu.hyu.cs.jcrux.tide.Peptide peptide = new edu.hyu.cs.jcrux.tide.Peptide(
@@ -1016,19 +1028,19 @@ public class TideIndexApplication extends CruxApplication {
 			addPeaksToPB(pbPeptide, peaksCharge2, 2, false);
 			addPeaksToPB(pbPeptide, negsCharge1, 1, true);
 			addPeaksToPB(pbPeptide, negsCharge2, 2, true);
-			
+
 			writer.write(pbPeptide.build());
-			
+
 		}
-		
+
 		writer.finish();
 	}
 
 	void addPeaksToPB(Peptide.Builder peptide, TheoreticalPeakArr peaks,
 			int charge, boolean neg) {
 		int lastCode = 0;
-		
-		for(int i = 0 ; i < peaks.size(); i ++){
+
+		for (int i = 0; i < peaks.size(); i++) {
 			int delta = peaks.get(i).getCode() - lastCode;
 			lastCode = peaks.get(i).getCode();
 			if (neg) {

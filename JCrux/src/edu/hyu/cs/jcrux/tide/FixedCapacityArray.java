@@ -7,7 +7,7 @@ public class FixedCapacityArray<C> implements Iterable<C> {
 
 	private C mData[];
 	private int mSize;
-
+	
 	@SuppressWarnings("unchecked")
 	public void init(int capacity) {
 		mSize = 0;

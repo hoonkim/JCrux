@@ -1,5 +1,6 @@
 package edu.hyu.cs.jcrux.tide;
 
+import java.util.Collection;
 import java.util.List;
 
 import edu.hyu.cs.pb.PeptidesPB.Peptide;
@@ -32,7 +33,7 @@ public class OrderedPeakSets {
 			mergePeaks(mBSeries[0], mYSeries[0], mTemp3);
 			mergeExceptions(mTemp3, peptide.getPeak1List(), mTemp1);
 		} else {
-			mergePeaks(mBSeries[0], mYSeries[1], mTemp1);
+			mergePeaks(mBSeries[0], mYSeries[0], mTemp1);
 		}
 		if ((peptide != null) && (peptide.getPeak2Count() > 0)) {
 			mergePeaks(mBSeries[1], mYSeries[1], mTemp3);
@@ -46,11 +47,22 @@ public class OrderedPeakSets {
 	private void mergePeaks(TheoreticalPeakArr a, TheoreticalPeakArr b,
 			TheoreticalPeakArr result) {
 		result.clear();
-		for (int i = 0; i < a.size(); i++) {
-			result.addLast(a.get(i));
+		
+		int a_c = 0, b_c = 0;
+		
+		while(a_c < a.size() && b_c < b.size()){
+			if(a.get(a_c).isSmaller(b.get(b_c))){
+				result.addLast(a.get(a_c++));
+			} else {
+				result.addLast(b.get(b_c++));
+			}
 		}
-		for (int i = 0; i < b.size(); i++) {
-			result.addLast(b.get(i));
+		
+		for (; a_c < a.size(); a_c++) {
+			result.addLast(a.get(a_c));
+		}
+		for (; b_c < b.size(); b_c++) {
+			result.addLast(b.get(b_c));
 		}
 	}
 
