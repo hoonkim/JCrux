@@ -859,8 +859,7 @@ public class TideIndexApplication extends CruxApplication {
 		Header.Builder headerWithMods = Header.newBuilder();
 
 		// Set up peptides header
-		Header.PeptidesHeader.Builder pepHeader = Header.PeptidesHeader
-				.newBuilder();
+		Header.PeptidesHeader.Builder pepHeader = headerWithMods.getPeptidesHeaderBuilder();
 		pepHeader.clear();
 		pepHeader.setMinMass(minMass);
 		pepHeader.setMaxMass(maxMass);
@@ -878,7 +877,7 @@ public class TideIndexApplication extends CruxApplication {
 		// FIXME 맞는지 확신은 없음.
 		pepHeader.setMods(varModTable.parsedModTable());
 
-		headerWithMods.setPeptidesHeader(pepHeader);
+		//headerWithMods.setPeptidesHeader(pepHeader);
 
 		headerWithMods.setFileType(Header.FileType.PEPTIDES);
 		headerWithMods.setCommandLine(cmdLine);
@@ -889,14 +888,13 @@ public class TideIndexApplication extends CruxApplication {
 		// headerWithMods = headerWithMods.addSource(source.build());
 
 		Header.Builder headerNoMods = headerWithMods.clone();
-		PeptidesHeader.Builder delPeptideHeader = PeptidesHeader
-				.newBuilder(headerNoMods.getPeptidesHeader());
-		ModTable.Builder del = ModTable.newBuilder(delPeptideHeader.getMods());
+		PeptidesHeader.Builder delPeptideHeader = headerNoMods.getPeptidesHeaderBuilder();
+		ModTable.Builder del = delPeptideHeader.getModsBuilder();
 		del.clearVariableMod();
 		del.clearUniqueDeltas();
 
-		delPeptideHeader.setMods(del);
-		headerNoMods.setPeptidesHeader(delPeptideHeader);
+		//delPeptideHeader.setMods(del);
+		//headerNoMods.setPeptidesHeader(delPeptideHeader);
 
 		boolean needMods = varModTable.uniqueDeltaSize() > 0;
 
@@ -987,7 +985,7 @@ public class TideIndexApplication extends CruxApplication {
 
 		Header.Builder newHeader = Header.newBuilder();
 		newHeader.setFileType(Header.FileType.PEPTIDES);
-		
+		newHeader.setPeptidesHeader(origHeader.getPeptidesHeader());
 
 		Header.PeptidesHeader.Builder subHeader = newHeader.getPeptidesHeaderBuilder();
 		subHeader.setHasPeaks(true);
