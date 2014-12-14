@@ -97,7 +97,13 @@ public class Flags {
 	}
 
 	public static DECOY_TYPE getTideDecoyTypeParameter(final String option) {
-		// TODO 여기도 기본 셔플 디코이.
+		if(line.hasOption(option)){
+			String decoyType = line.getOptionValue(option);
+			if(decoyType.equals("none")){
+				return DECOY_TYPE.NO_DECOYS;
+			}
+			System.out.println(decoyType);
+		}
 		return DECOY_TYPE.PEPTIDE_SHUFFLE_DECOYS;
 
 	}

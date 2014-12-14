@@ -11,10 +11,12 @@ import java.util.LinkedList;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import sun.font.CreatedFontTracker;
 import edu.hyu.cs.flags.Flags;
 import edu.hyu.cs.jcrux.Carp;
 import edu.hyu.cs.jcrux.CruxApplication;
 import edu.hyu.cs.jcrux.CruxUtils;
+import edu.hyu.cs.jcrux.GenerateDecoys;
 import edu.hyu.cs.jcrux.Objects.COMMAND_T;
 import edu.hyu.cs.jcrux.Objects.DECOY_TYPE;
 import edu.hyu.cs.jcrux.Objects.DIGEST;
@@ -66,8 +68,8 @@ public class TideIndexApplication extends CruxApplication {
 			mLength = length;
 			mProteinId = proteinId;
 			mProteinPos = proteinPos;
-
-			mResidues = proteinSeq.substring(proteinPos, proteinPos + length);
+			
+			mResidues = proteinSeq.substring(proteinPos);
 		}
 
 		TideIndexPeptide(final TideIndexPeptide other) {
@@ -204,6 +206,9 @@ public class TideIndexApplication extends CruxApplication {
 
 		// 2014-07-28
 		String decoyPrefix = Flags.getStringParameter("decoy-prefix");
+		if (decoyPrefix == null) {
+			decoyPrefix = "decoy_";
+		}
 
 		outProteinPbHeader.clear();
 		outProteinPbHeader.setFileType(Header.FileType.RAW_PROTEINS);
@@ -233,11 +238,13 @@ public class TideIndexApplication extends CruxApplication {
 		int curProtein = -1;
 		LinkedList<Pair2<ProteinInfo, LinkedList<PeptideInfo>>> cleavedPeptideInfo = new LinkedList<Pair2<ProteinInfo, LinkedList<PeptideInfo>>>();
 		TreeSet<String> setTargets = new TreeSet<String>();
+		TreeSet<String> setDecoys = new TreeSet<String>();
 		TreeMap<String, TargetInfo> targetInfo = new TreeMap<String, TargetInfo>();
 
 		Pair2<String, String> proteinNameAndSequence = Pair2.of(null, null);
 
 		int targetGenerated = 0;
+		int decoyGenerated = 0;
 
 		while (getNextProtein(fastaStream, proteinNameAndSequence)) {
 
@@ -289,18 +296,154 @@ public class TideIndexApplication extends CruxApplication {
 				TideIndexPeptide pepTarget = new TideIndexPeptide(pepMass,
 						pepLen, proteinSequence, curProtein, startLoc, false);
 				outPeptideHeap.addLast(pepTarget);
+				if (decoyType != DECOY_TYPE.NO_DECOYS) {
+					setTargets.add(cleavedSequence);
+					final String setTarget = cleavedSequence;
+					targetInfo.put(setTarget, new TargetInfo(proteinInfo,
+							startLoc, pepMass));
+				}
 
 				// FIXME ?? 이부분 이상함.
 				++targetGenerated;
 				++i;
 
 			}
-
 		}
+		// Decoy 시작
+		TreeMap<String, String> targetToDecoy = new TreeMap<String, String>();
+
+		if (decoyType == DECOY_TYPE.PROTEIN_REVERSE_DECOYS) {
+			if (decoyFasta != null) {
+				Carp.carp(Carp.CARP_INFO,
+						"Writing reverse-protein fasta and decoys...");
+			}
+
+			LinkedList<PeptideInfo> cleavedReverse = new LinkedList<PeptideInfo>();
+			for (Pair2<ProteinInfo, LinkedList<PeptideInfo>> i : cleavedPeptideInfo) {
+				String decoyProtein = i.first.getSequence();
+				decoyProtein = new StringBuilder(decoyProtein).reverse()
+						.toString();
+				if (decoyFasta != null) {
+
+					try {
+						decoyFasta.write((">" + decoyPrefix + i.first.getName()
+								+ "\n" + decoyProtein + "\n").getBytes());
+						decoyFasta.flush();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				cleaveProtein(decoyProtein, enzyme, digestion, missedCleavages,
+						minLength, maxLength, cleavedReverse);
+				for (PeptideInfo j : cleavedReverse) {
+					String cleavedSequence = j.first;
+					double pepMass = calcPepMassTide(cleavedSequence, massType);
+					if (pepMass < 0.0) {
+						Carp.carp(
+								Carp.CARP_WARNING,
+								"Ignoering invalid sequence in decoy fasta <%s>",
+								cleavedSequence);
+						continue;
+					} else if (pepMass < minMass || pepMass > maxMass) {
+						// Skip to next peptide if not in mass range
+						continue;
+					} else if (setTargets.contains(cleavedSequence)) {
+						// Seqiemce already exists as a target
+						continue;
+					}
+					final int startLoc = j.second;
+					final int pepLen = cleavedSequence.length();
+					String decoySequence = j.first;
+					outProteinSequences.addLast(decoySequence);
+
+					// Write pbProtein
+					getDecoyPbProtein(++curProtein,
+							new ProteinInfo(i.first.getName(), decoyProtein),
+							decoySequence, startLoc, pbProteinBuilder);
+					proteinWriter.write(pbProteinBuilder.build());
+					// Add decoy to heap
+					TideIndexPeptide pepDecoy = new TideIndexPeptide(pepMass,
+							cleavedSequence.length(), decoySequence,
+							curProtein, (startLoc > 0) ? 1 : 0, true);
+					outPeptideHeap.addLast(pepDecoy);
+					++decoyGenerated;
+				}
+			}
+		} else {
+			for (String i : setTargets) {
+				final String setTarget = i;
+				final TargetInfo targetLookUp = targetInfo.get(setTarget);
+				final ProteinInfo proteinInfo = targetLookUp.getProteinInfo();
+				final int startLoc = targetLookUp.getStart();
+				String decoyCheck = targetToDecoy.get(setTarget);
+				String decoySequence = null;
+				if (decoyCheck != null) {
+					// Decoy already generated for this sequence
+					decoySequence = decoyCheck;
+				} else {
+					// Try to generate Decoy
+					Pair2<Boolean, String> isShuffleAndSequence = Pair2.of(
+							decoyType == decoyType.PEPTIDE_SHUFFLE_DECOYS,
+							decoySequence);
+					if (!GenerateDecoys.makeDecoy(i, setTargets, setDecoys,
+							isShuffleAndSequence)) {
+						Carp.carp(Carp.CARP_WARNING,
+								"Failed to generate decoy for sequence %s", i);
+						continue;
+					} else {
+						decoySequence = isShuffleAndSequence.second;
+						setDecoys.add(decoySequence);
+						targetToDecoy.put(setTarget, decoySequence);
+					}
+				}
+				outProteinSequences.addLast(decoySequence);
+
+				// Write pb::Protein
+				getDecoyPbProtein(++curProtein, proteinInfo, decoySequence,
+						startLoc, pbProteinBuilder);
+				proteinWriter.write(pbProteinBuilder.build());
+				// Add decoy to heap
+				double pepMass = targetLookUp.getMass();
+				TideIndexPeptide pepDecoy = new TideIndexPeptide(pepMass,
+						i.length(), decoySequence, curProtein,
+						(startLoc > 0) ? 1 : 0, true);
+				outPeptideHeap.addLast(pepDecoy);
+				++decoyGenerated;
+			}
+		}
+
+		Carp.carp(Carp.CARP_DEBUG, "FASTA produced %d targets and %d decoys",
+				targetGenerated, decoyGenerated);
+
+		if ((decoyFasta != null)
+				&& (decoyType != DECOY_TYPE.PROTEIN_REVERSE_DECOYS)) {
+			Carp.carp(Carp.CARP_INFO, "Writing decoy fasta...");
+			for (Pair2<ProteinInfo, LinkedList<PeptideInfo>> i : cleavedPeptideInfo) {
+				String decoyProtein = i.first.getSequence();
+				for (PeptideInfo j : i.second) {
+					final String targetSequence = j.first;
+					final String setTarget = (setTargets
+							.contains(targetSequence)) ? targetSequence : null;
+					if ((setTarget != null)
+							&& (targetToDecoy.containsKey(setTarget))) {
+						decoyProtein = decoyProtein.substring(0, j.second)
+								+ targetToDecoy.get(setTarget)
+								+ decoyProtein.substring(j.second
+										+ targetSequence.length());
+					}
+				}
+				// Write out the final protein
+				try {
+					decoyFasta.write((">" + decoyPrefix + i.first.getName()
+							+ "\n" + decoyProtein + "\n").getBytes());
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
 		proteinWriter.finish();
 		Collections.sort(outPeptideHeap);
-
-		Carp.carp(Carp.CARP_DEBUG, "FASTA produced %d targets", targetGenerated);
 
 	}
 
@@ -314,7 +457,6 @@ public class TideIndexApplication extends CruxApplication {
 
 		try {
 			if (!fasta.ready()) {
-				System.out.println("not ready");
 				return false;
 			}
 
@@ -527,8 +669,8 @@ public class TideIndexApplication extends CruxApplication {
 		Header.PeptidesHeader.Builder tempPeptidesHeader = pbHeader
 				.getPeptidesHeaderBuilder();
 		tempPeptidesHeader.setHasPeaks(false);
+		tempPeptidesHeader.setDecoys(Flags.getTideDecoyTypeParameter("decoy-format").ordinal());
 		// decoy type 정하는거 일단 보류
-		pbHeader.setPeptidesHeader(tempPeptidesHeader);
 		HeadedRecordWriter peptideWriter = new HeadedRecordWriter(
 				peptideAndAuxLocsPbFile.first, pbHeader.build()); // put header
 																	// in
@@ -541,7 +683,7 @@ public class TideIndexApplication extends CruxApplication {
 		Header.Source.Builder auxLocsSource = auxLocsHeader.addSourceBuilder();
 		// FIXME 여기도 뭔가 이상한데? 왜 peptidePbFile이야?
 		auxLocsSource.setFiletype(peptideAndAuxLocsPbFile.first);
-		auxLocsSource.setHeader(pbHeader.clone());
+		auxLocsSource.setHeader(pbHeader);
 		HeadedRecordWriter auxLocWriter = new HeadedRecordWriter(
 				peptideAndAuxLocsPbFile.second, auxLocsHeader.build());
 
@@ -781,9 +923,11 @@ public class TideIndexApplication extends CruxApplication {
 			Carp.carp(Carp.CARP_FATAL, "Error in MassConstants::Init");
 		}
 
-		DECOY_TYPE decoyType = Flags.getTideDecoyTypeParameter("decoy-foramt");
+		DECOY_TYPE decoyType = Flags.getTideDecoyTypeParameter("decoy-format");
 		String decoyPrefix = Flags.getStringParameter("decoy-prefix");
-
+		if (decoyPrefix == null) {
+			decoyPrefix = "decoy_";
+		}
 		// Set up output Paths.
 		String fasta = argv[argv.length - 2];
 		String index = argv[argv.length - 1];
@@ -814,7 +958,11 @@ public class TideIndexApplication extends CruxApplication {
 			}
 		}
 
-		// 디코이 만드는부분 생략함 176 줄.
+		FileOutputStream outDecoyFasta = GenerateDecoys
+				.canGenerateDecoyProteins() ? CruxUtils.createStreamInPath(
+				CruxUtils.makeFilePath("tide-index.decoy.fasta"), null,
+				overwrite) : null;
+
 
 		if (CruxUtils.createOutputDirectory(index, overwrite) != 0) {
 			Carp.carp(Carp.CARP_FATAL, "Error creating index directory");
@@ -823,43 +971,40 @@ public class TideIndexApplication extends CruxApplication {
 				|| CruxUtils.fileExists(outAux)) {
 			if (overwrite) {
 				Carp.carp(Carp.CARP_DEBUG, "Cleaning old index files(s)");
-				//CruxUtils.fileDelete(outProteins);
+				CruxUtils.fileDelete(outProteins);
 				CruxUtils.fileDelete(outPeptides);
-				//CruxUtils.fileDelete(outAux);
-				//CruxUtils.fileDelete(modlessPeptides);
-				//CruxUtils.fileDelete(peaklessPeptides);
+				CruxUtils.fileDelete(outAux);
+				CruxUtils.fileDelete(modlessPeptides);
+				CruxUtils.fileDelete(peaklessPeptides);
 			} else {
 				Carp.carp(Carp.CARP_FATAL, "Index file(s) alreaday exists ,"
 						+ "use --overwrite T or a different index name");
 			}
 		}
 
-		// 198 라인 일단 보류.
 
 		Carp.carp(Carp.CARP_INFO,
 				"Reading %s and computing umodified peptides...", fasta);
 
-		// TODO 안되면 여기를 의심.
-
 		Header.Builder proteinPbHeader = Header.newBuilder();
 
 		LinkedList<TideIndexPeptide> peptideHeap = new LinkedList<TideIndexPeptide>();
-		// TODO TideIndexPeptide 구현.
 		LinkedList<String> proteinSequences = new LinkedList<String>();
 
 		System.out.println("fastatopb start : " + Flags.getTime());
 
-//		fastaToPb(cmdLine, enzyme, digestion, missedCleavages, minMass,
-//				maxMass, minLength, maxLength, mass_type, decoyType, fasta,
-//				outProteins, proteinPbHeader, peptideHeap, proteinSequences,
-//				null);
+		fastaToPb(cmdLine, enzyme, digestion, missedCleavages, minMass,
+				maxMass, minLength, maxLength, mass_type, decoyType, fasta,
+				outProteins, proteinPbHeader, peptideHeap, proteinSequences,
+				outDecoyFasta);
 
 		System.out.println("fastatopb end : " + Flags.getTime());
 
 		Header.Builder headerWithMods = Header.newBuilder();
 
 		// Set up peptides header
-		Header.PeptidesHeader.Builder pepHeader = headerWithMods.getPeptidesHeaderBuilder();
+		Header.PeptidesHeader.Builder pepHeader = headerWithMods
+				.getPeptidesHeaderBuilder();
 		pepHeader.clear();
 		pepHeader.setMinMass(minMass);
 		pepHeader.setMaxMass(maxMass);
@@ -868,16 +1013,12 @@ public class TideIndexApplication extends CruxApplication {
 		pepHeader.setMonoisotopicPrecursor(monoisotopicPrecursor);
 		pepHeader.setEnzyme(enzyme.toString());
 
-		// FIXME 이부분 모호함.
 		if (enzyme.toString() != "none") {
 			pepHeader.setFullDigestion(digestion == DIGEST.FULL_DIGEST);
 			pepHeader.setMaxMissedCleavages(missedCleavages);
 		}
 
-		// FIXME 맞는지 확신은 없음.
 		pepHeader.setMods(varModTable.parsedModTable());
-
-		//headerWithMods.setPeptidesHeader(pepHeader);
 
 		headerWithMods.setFileType(Header.FileType.PEPTIDES);
 		headerWithMods.setCommandLine(cmdLine);
@@ -885,16 +1026,13 @@ public class TideIndexApplication extends CruxApplication {
 		Header.Source.Builder source = headerWithMods.addSourceBuilder();
 		source.setHeader(headerWithMods.build());
 		source.setFilename(AbsPath.absPath(outProteins));
-		// headerWithMods = headerWithMods.addSource(source.build());
 
 		Header.Builder headerNoMods = headerWithMods.clone();
-		PeptidesHeader.Builder delPeptideHeader = headerNoMods.getPeptidesHeaderBuilder();
+		PeptidesHeader.Builder delPeptideHeader = headerNoMods
+				.getPeptidesHeaderBuilder();
 		ModTable.Builder del = delPeptideHeader.getModsBuilder();
 		del.clearVariableMod();
 		del.clearUniqueDeltas();
-
-		//delPeptideHeader.setMods(del);
-		//headerNoMods.setPeptidesHeader(delPeptideHeader);
 
 		boolean needMods = varModTable.uniqueDeltaSize() > 0;
 
@@ -902,8 +1040,8 @@ public class TideIndexApplication extends CruxApplication {
 		Carp.carp(Carp.CARP_DEBUG, "basicPeptides=%s", basicPeptides);
 		System.out
 				.println("writePeptidesAndAuxLocs start : " + Flags.getTime());
-//		writePeptidesAndAuxLocs(peptideHeap, Pair2.of(basicPeptides, outAux),
-//				headerNoMods);
+		writePeptidesAndAuxLocs(peptideHeap, Pair2.of(basicPeptides, outAux),
+				headerNoMods);
 		System.out.println("writePeptidesAndAuxLocs end : " + Flags.getTime());
 
 		LinkedList<Protein> proteins = new LinkedList<Protein>();
@@ -936,19 +1074,12 @@ public class TideIndexApplication extends CruxApplication {
 		// TODO out target list 구현 266~375 line.
 
 		Carp.carp(Carp.CARP_INFO, "Precomputing theoretical spectra...");
-		
+
 		System.out.println("addTheoriticalPeaks start : " + Flags.getTime());
 		addTheoriticalPeaks(proteins, peaklessPeptides, outPeptides);
-		System.out.println("addTheoriticalPeaks end : " + 14246);
-		
+		System.out.println("addTheoriticalPeaks end : " + Flags.getTime());
 
 		Carp.carp(Carp.CARP_DEBUG, "디버그 종료.");
-
-		// FileOutputStream outDecoyFasta = GenerateDecoys
-		// .canGenerateDecoyProteins() ? CruxUtils.createStreamInPath(
-		// CruxUtils.makeFilePath("tide-index.decoy.fasta"), null,
-		// overwrite) : null;
-		/* very important comments !! */
 
 		return 0;
 	}
@@ -987,7 +1118,8 @@ public class TideIndexApplication extends CruxApplication {
 		newHeader.setFileType(Header.FileType.PEPTIDES);
 		newHeader.setPeptidesHeader(origHeader.getPeptidesHeader());
 
-		Header.PeptidesHeader.Builder subHeader = newHeader.getPeptidesHeaderBuilder();
+		Header.PeptidesHeader.Builder subHeader = newHeader
+				.getPeptidesHeaderBuilder();
 		subHeader.setHasPeaks(true);
 		Header.Source.Builder source = newHeader.addSourceBuilder();
 		source.setHeader(origHeader);
@@ -1055,5 +1187,34 @@ public class TideIndexApplication extends CruxApplication {
 				}
 			}
 		}
+	}
+
+	void getDecoyPbProtein(int id, final ProteinInfo targetProteinInfo,
+			String decoyPeptideSequence, int startLoc,
+			Protein.Builder outPbProtein) {
+		String proteinSequence = targetProteinInfo.getSequence();
+		int pepLen = decoyPeptideSequence.length();
+		// Add N term to decoySequence, if it exists
+		if (startLoc > 0) {
+			decoyPeptideSequence = decoyPeptideSequence.substring(0, 1)
+					+ proteinSequence.charAt(startLoc - 1)
+					+ decoyPeptideSequence.substring(1);
+		}
+		// Add C term to decoySequence, if it exists
+		int cTermLoc = startLoc + pepLen;
+		decoyPeptideSequence += (cTermLoc < proteinSequence.length()) ? proteinSequence
+				.charAt(cTermLoc) : "-";
+		// Append original target sequence, unless using protein level decoys
+		if (Flags.getTideDecoyTypeParameter("decoy-format") != DECOY_TYPE.PROTEIN_REVERSE_DECOYS) {
+			decoyPeptideSequence += targetProteinInfo.getSequence().substring(
+					startLoc, startLoc + pepLen);
+		}
+		String decoyPrefix = Flags.getStringParameter("decoy-prefix");
+		if (decoyPrefix == null) {
+			decoyPrefix = "decoy_";
+		}
+		getPbProtein(id, decoyPrefix + targetProteinInfo.getName(),
+				decoyPeptideSequence, outPbProtein);
+		outPbProtein.setTargetPos(startLoc);
 	}
 }
